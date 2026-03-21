@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Vehículos - Modelos{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="bg-white shadow rounded p-4">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-primary mb-0">Modelos de Vehículos</h2>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAgregarModelo">
+                Agregar Nuevo Vehículo
+            </button>
+        </div>
+
+        <!-- FILTROS -->
+        <form method="GET" class="row g-3 mb-4" id="formFiltro">
+            <div class="col-md-4">
+                <label class="form-label">Marca</label>
+                <select class="form-select" name="marca_id" id="filtro_marca">
+                    <option value="">Todas las marcas</option>
+                    {% for m in marcas %}
+                    <option value="{{ m[0] }}" {{ 'selected' if m[0] == marca_id else '' }}>{{ m[1] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Modelo</label>
+                <input type="text" class="form-control" name="modelo" 
+                       value="{{ modelo_search }}" 
+                       placeholder="Ej: 120i, Corolla, Hilux...">
+            </div>
+            <div class="col-md-4 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">Filtrar</button>
+                <button type="button" onclick="limpiarFiltros()" class="btn btn-secondary flex-fill">Limpiar</button>
+            </div>
+        </form>
+
+        <!-- TABLA -->
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-bordered align-middle">
+                <thead class="table-light text-center">
+                    <tr>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Comentario</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="text-center">
+                    {% if modelos %}
+                        {% for mod in modelos %}
+                        <tr>
+                            <td class="fw-semibold">{{ mod[1] }}</td>
+                            <td>{{ mod[2] }}</td>
+                            <td>{{ mod[3] or '-' }}</td>
+                            <td class="text-center">
+                                <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditarModelo{{ mod[0] }}">Editar</button>
+                                <form action="{{ url_for('eliminar_modelo', id=mod[0]) }}" method="POST" class="delete-form d-inline">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                No se encontraron modelos con los filtros aplicados
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- PAGINACIÓN -->
+        {% if pages > 1 %}
+        <nav aria-label="Paginación de modelos" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page > 1 %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos', page=1, marca_id=marca_id, modelo=modelo_search) }}">« Primera</a></li>
+                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos', page=page-1, marca_id=marca_id, modelo=modelo_search) }}">‹ Anterior</a></li>
+                {% endif %}
+
+                {% set rango_inicio = [1, page - 3] | max %}
+                {% set rango_fin = [pages, page + 3] | min %}
+
+                {% if rango_inicio > 1 %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+
+                {% for p in range(rango_inicio, rango_fin + 1) %}
+                <li class="page-item {{ 'active' if p == page else '' }}">
+                    <a class="page-link" href="{{ url_for('vehiculos', page=p, marca_id=marca_id, modelo=modelo_search) }}">{{ p }}</a>
+                </li>
+                {% endfor %}
+
+                {% if rango_fin < pages %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+
+                {% if page < pages %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos', page=page+1, marca_id=marca_id, modelo=modelo_search) }}">Siguiente ›</a></li>
+                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos', page=pages, marca_id=marca_id, modelo=modelo_search) }}">Última »</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        <p class="text-center text-muted mt-3">
+            Mostrando {{ modelos|length }} de {{ total }} modelos
+        </p>
+
+    </div>
+
+    <!-- Modal Agregar Modelo -->
+    <div class="modal fade" id="modalAgregarModelo" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-primary">Agregar Nuevo Vehículo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="{{ url_for('agregar_modelo') }}" method="POST">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="chkNuevaMarca">
+                            <label class="form-check-label">Crear marca nueva (ej: Ferrari)</label>
+                        </div>
+
+                        <div id="divNuevaMarca" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">Nombre de la Nueva Marca</label>
+                                <input type="text" class="form-control" name="nueva_marca" placeholder="Ferrari">
+                            </div>
+                        </div>
+
+                        <div id="divMarcaExistente">
+                            <label class="form-label">Marca existente</label>
+                            <select class="form-select" name="id_marca">
+                                {% for m in marcas %}
+                                <option value="{{ m[0] }}">{{ m[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Modelo</label>
+                            <input type="text" class="form-control" name="nombre_modelo" required placeholder="Ej: 488 Spider">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Comentario (opcional)</label>
+                            <textarea class="form-control" name="comentario" rows="2"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar Vehículo</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modales Editar Modelo -->
+    {% for mod in modelos %}
+    <div class="modal fade" id="modalEditarModelo{{ mod[0] }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-primary">Editar Modelo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="{{ url_for('editar_modelo', id=mod[0]) }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Marca</label>
+                            <select class="form-select" name="id_marca" required>
+                                {% for m in marcas %}
+                                <option value="{{ m[0] }}" {{ 'selected' if m[0] == mod[1] else '' }}>{{ m[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Modelo</label>
+                            <input type="text" class="form-control" name="nombre_modelo" value="{{ mod[2] }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Comentario</label>
+                            <textarea class="form-control" name="comentario" rows="2">{{ mod[3] or '' }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Actualizar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+// Limpiar filtros
+function limpiarFiltros() {
+    window.location.href = "{{ url_for('vehiculos') }}";
+}
+
+// SweetAlert para eliminar
+$('.delete-form').on('submit', function(e) {
+    e.preventDefault();
+    var form = this;
+    Swal.fire({
+        title: '¿Eliminar modelo?',
+        text: "No se puede deshacer",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar'
+    }).then((result) => {
+        if (result.isConfirmed) form.submit();
+    });
+});
+</script>
+{% endblock %}

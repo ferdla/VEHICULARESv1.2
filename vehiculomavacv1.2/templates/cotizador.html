@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Cotizador Vehicular{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+
+    <div class="text-center mb-5">
+        <h1 class="text-primary display-5 fw-bold">Cotización Vehicular</h1>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+
+            <div class="card shadow">
+                <div class="card-body p-5">
+
+                    <!-- Broker -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Nombre del Broker</label>
+                        <input type="text" class="form-control form-control-lg" 
+                               value="MAVAC CORREDORES DE SEGUROS S.A.C" readonly>
+                    </div>
+
+                    <!-- Asegurado / Contacto -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Asegurado o Contacto</label>
+                        <input type="text" id="asegurado" class="form-control form-control-lg" 
+                               placeholder="Nombre del cliente o contacto">
+                    </div>
+
+                    <!-- Vehículo (placa o descripción) -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Vehículo (Placa o Descripción)</label>
+                        <input type="text" id="vehiculo" class="form-control form-control-lg" 
+                               placeholder="Ej: ABC-123 o Toyota Corolla">
+                    </div>
+
+                    <!-- Marca -->
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-bold">Marca</label>
+                            <select id="marca" class="form-select form-select-lg">
+                                <option value="">-- Seleccione marca --</option>
+                                {% for m in marcas %}
+                                <option value="{{ m[0] }}">{{ m[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Modelo -->
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-bold">Modelo</label>
+                            <select id="modelo" class="form-select form-select-lg" disabled>
+                                <option value="">-- Primero seleccione marca --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Año (lista desplegable) -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Año del Vehículo</label>
+                        <select id="anio" class="form-select form-select-lg">
+                            <option value="">-- Seleccione año --</option>
+                            {% for a in años %}
+                            <option value="{{ a.value }}">{{ a.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Botón Calcular -->
+                    <div class="d-grid">
+                        <button onclick="mostrarResumen()" class="btn btn-primary btn-lg">
+                            Ver Resumen y Continuar
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- RESUMEN -->
+            <div id="resumen" class="card shadow mt-4" style="display:none;">
+                <div class="card-body">
+                    <h4 class="text-primary mb-3">Datos de la Cotización</h4>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <strong>Broker:</strong><br>
+                            <span id="res_broker">MAVAC CORREDORES DE SEGUROS S.A.C</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Asegurado:</strong><br>
+                            <span id="res_asegurado">-</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Vehículo:</strong><br>
+                            <span id="res_vehiculo">-</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Marca:</strong><br>
+                            <span id="res_marca">-</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Modelo:</strong><br>
+                            <span id="res_modelo">-</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Año:</strong><br>
+                            <span id="res_anio">-</span>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <button onclick="continuarCotizacion()" class="btn btn-success btn-lg">
+                            Continuar con la Cotización →
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+// Cargar modelos al seleccionar marca
+$('#marca').change(function() {
+    const marcaId = $(this).val();
+    const selectModelo = $('#modelo');
+
+    selectModelo.html('<option value="">-- Seleccione modelo --</option>');
+    selectModelo.prop('disabled', true);
+
+    if (marcaId) {
+        $.getJSON(`/api/modelos_por_marca/${marcaId}`, function(data) {
+            $.each(data, function(i, mod) {
+                selectModelo.append($('<option>').val(mod.id).text(mod.nombre));
+            });
+            selectModelo.prop('disabled', false);
+        }).fail(function() {
+            alert('Error al cargar modelos');
+        });
+    }
+});
+
+// Mostrar resumen
+function mostrarResumen() {
+    const broker = "MAVAC CORREDORES DE SEGUROS S.A.C";
+    const asegurado = $('#asegurado').val().trim() || '-';
+    const vehiculo = $('#vehiculo').val().trim() || '-';
+    const marcaText = $('#marca option:selected').text() || '-';
+    const modeloText = $('#modelo option:selected').text() || '-';
+    const anioText = $('#anio option:selected').text() || '-';
+
+    $('#res_broker').text(broker);
+    $('#res_asegurado').text(asegurado);
+    $('#res_vehiculo').text(vehiculo);
+    $('#res_marca').text(marcaText);
+    $('#res_modelo').text(modeloText);
+    $('#res_anio').text(anioText);
+
+    $('#resumen').fadeIn();
+}
+
+function continuarCotizacion() {
+    alert('✅ Datos guardados. Próximo paso: Selección de coberturas y cálculo de prima');
+    // Ejemplo: window.location.href = '/cotizacion-final';
+}
+</script>
+{% endblock %}

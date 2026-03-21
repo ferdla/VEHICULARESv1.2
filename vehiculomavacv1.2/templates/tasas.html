@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Tasas por Empresa y Tipo de Riesgo{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="bg-white shadow rounded p-4">
+
+        <h2 class="text-primary mb-4">Tasas por Empresa y Tipo de Riesgo</h2>
+
+        <!-- FILTROS -->
+        <form method="GET" class="row g-3 mb-5" id="formFiltro">
+            <div class="col-md-5">
+                <label class="form-label">Empresa</label>
+                <select class="form-select" name="empresa_id" id="filtro_empresa">
+                    <option value="">-- Seleccione empresa --</option>
+                    {% for e in empresas %}
+                    <option value="{{ e[0] }}" {{ 'selected' if e[0] == empresa_id else '' }}>{{ e[1] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Tipo de Riesgo (opcional)</label>
+                <select class="form-select" name="tipo_riesgo_id" id="filtro_tipo_riesgo" disabled>
+                    <option value="">-- Todos los tipos --</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">Filtrar</button>
+                <button type="button" onclick="limpiarFiltros()" class="btn btn-secondary flex-fill">Limpiar</button>
+            </div>
+        </form>
+
+        <!-- TABLA DE TASAS -->
+        {% if empresa_id and tipos_riesgo %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped text-center">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Año</th>
+                        {% for tr in tipos_riesgo %}
+                        <th title="{{ tr[1] }}">{{ tr[2] or tr[1][:15] ~ '...' }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for año in años %}
+                    <tr>
+                        <td class="fw-bold">{{ año.label }}</td>
+                        {% for tr in tipos_riesgo %}
+                        <td>
+                            {% set key = (año.inicio, año.fin, año.es_0km) %}
+                            {% if key in tasas_data and tr[0] in tasas_data[key] %}
+                                {{ tasas_data[key][tr[0]] | round(2) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif empresa_id %}
+        <div class="alert alert-warning text-center">
+            Esta empresa no tiene tipos de riesgo asignados o tasas registradas.
+        </div>
+        {% else %}
+        <div class="alert alert-info text-center">
+            Seleccione una empresa para ver sus tasas por tipo de riesgo.
+        </div>
+        {% endif %}
+
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+// Cargar tipos de riesgo al seleccionar empresa
+$('#filtro_empresa').change(function() {
+    const empresaId = $(this).val();
+    const selectTipo = $('#filtro_tipo_riesgo');
+
+    selectTipo.html('<option value="">-- Todos los tipos --</option>');
+    selectTipo.prop('disabled', true);
+
+    if (empresaId) {
+        $.getJSON(`/api/tipos_riesgo_por_empresa/${empresaId}`, function(data) {
+            $.each(data, function(i, tipo) {
+                selectTipo.append(
+                    $('<option>').val(tipo.id).text(tipo.nombre + (tipo.codigo ? ' (' + tipo.codigo + ')' : ''))
+                );
+            });
+            selectTipo.prop('disabled', false);
+        }).fail(function() {
+            alert('Error al cargar tipos de riesgo');
+        });
+    }
+});
+
+// Limpiar filtros
+function limpiarFiltros() {
+    window.location.href = "{{ url_for('tasas') }}";
+}
+</script>
+{% endblock %}
