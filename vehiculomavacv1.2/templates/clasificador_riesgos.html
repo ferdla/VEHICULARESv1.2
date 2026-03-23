@@ -1,11 +1,20 @@
 {% extends "base.html" %}
-
 {% block title %}Clasificador de Riesgos{% endblock %}
 
 {% block content %}
 <div class="container my-4">
-
     <h2 class="text-primary mb-4">Clasificador de Riesgos Vehiculares</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
     <!-- FILTROS -->
     <form method="GET" class="row g-3 mb-4">
@@ -14,7 +23,7 @@
             <select class="form-select" name="empresa_id" id="filtro_empresa">
                 <option value="">-- Todas --</option>
                 {% for e in empresas %}
-                <option value="{{ e[0] }}" {{ 'selected' if e[0] == empresa_id else '' }}>{{ e[1] }}</option>
+                <option value="{{ e[0] }}" {{ 'selected' if e[0]==empresa_id else '' }}>{{ e[1] }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -29,7 +38,7 @@
             <select class="form-select" name="marca_id">
                 <option value="">-- Todas --</option>
                 {% for m in marcas %}
-                <option value="{{ m[0] }}" {{ 'selected' if m[0] == marca_id else '' }}>{{ m[1] }}</option>
+                <option value="{{ m[0] }}" {{ 'selected' if m[0]==marca_id else '' }}>{{ m[1] }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -40,22 +49,17 @@
     </form>
 
     <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#modalNuevaRegla">
-        + Nueva Regla General
+        + Nueva Regla
     </button>
 
-    <!-- TABLA DE REGLAS -->
-    <div class="table-responsive">
+    <!-- ── TABLA REGLAS CONFIRMADAS ── -->
+    <h5 class="mt-3 mb-2">Reglas registradas</h5>
+    <div class="table-responsive mb-5">
         <table class="table table-striped table-hover">
             <thead class="table-dark">
                 <tr>
-                    <th>Empresa</th>
-                    <th>Tipo de Riesgo</th>
-                    <th>Marca</th>
-                    <th>Modelo</th>
-                    <th>Años</th>
-                    <th>Suma</th>
-                    <th>Nota</th>
-                    <th>Acciones</th>
+                    <th>Empresa</th><th>Tipo Riesgo</th><th>Marca</th><th>Modelo</th>
+                    <th>Años</th><th>Suma</th><th>Nota</th><th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -65,223 +69,362 @@
                     <td>{{ r[3] }}</td>
                     <td>{{ r[4] }}</td>
                     <td>{{ r[5] or 'Toda la marca' }}</td>
-                    <td>{{ r[6] or '' }} - {{ r[7] or '' }}</td>
-                    <td>
-                        {% if r[8] %}≥ {{ r[8] }}{% elif r[9] %}≤ {{ r[9] }}{% else %}-{% endif %}
-                    </td>
+                    <td>{{ r[6] or '' }}{% if r[6] or r[7] %} - {% endif %}{{ r[7] or '' }}</td>
+                    <td>{% if r[8] %}≥ {{ r[8] }}{% elif r[9] %}≤ {{ r[9] }}{% else %}-{% endif %}</td>
                     <td>{{ r[10] or '-' }}</td>
                     <td>
-                        <button class="btn btn-sm btn-info" onclick="verExcepciones({{ r[0] | tojson }}, {{ r[2] | tojson }})">
+                        <button class="btn btn-sm btn-info"
+                                onclick="verExcepciones({{ r[0]|tojson }}, {{ r[2]|tojson }})">
                             Excepciones
                         </button>
+                        <form action="{{ url_for('clasificador.eliminar_regla', id_regla=r[0]) }}"
+                              method="POST" class="delete-regla d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not reglas %}
+                <tr><td colspan="8" class="text-center text-muted py-3">Sin reglas registradas con estos filtros.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ── TABLA REGLAS PENDIENTES ── -->
+    {% if reglas_pendientes %}
+    <div class="alert alert-warning d-flex align-items-center mb-3">
+        <span class="me-2">⏳</span>
+        <strong>Hay {{ reglas_pendientes|length }} regla(s) pendiente(s)</strong> — marca aún no existe en BD.
+        Se aplicarán automáticamente cuando se agregue la marca.
+    </div>
+    <div class="table-responsive mb-5">
+        <table class="table table-bordered border-warning">
+            <thead class="table-warning">
+                <tr>
+                    <th>Empresa</th><th>Tipo Riesgo</th>
+                    <th>Marca (pendiente)</th><th>Modelo</th>
+                    <th>Años</th><th>Nota</th><th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rp in reglas_pendientes %}
+                <tr>
+                    <td>{{ rp[1] }}</td>
+                    <td>{{ rp[2] }}</td>
+                    <td><span class="badge bg-warning text-dark">⏳ {{ rp[3] }}</span></td>
+                    <td>{{ rp[4] or 'Toda la marca' }}</td>
+                    <td>{{ rp[5] or '' }}{% if rp[5] or rp[6] %} - {% endif %}{{ rp[6] or '' }}</td>
+                    <td>{{ rp[9] or '-' }}</td>
+                    <td>
+                        <form action="{{ url_for('clasificador.eliminar_regla_pendiente', id_regla_pend=rp[0]) }}"
+                              method="POST" class="delete-regla-pend d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    {% endif %}
 
-    <!-- MODAL NUEVA REGLA GENERAL -->
+
+    <!-- ===== MODAL NUEVA REGLA ===== -->
     <div class="modal fade" id="modalNuevaRegla" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Nueva Regla General</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ url_for('agregar_regla') }}" method="POST">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Empresa</label>
-                                <select class="form-select" name="id_empresa" id="modal_empresa" required>
-                                    {% for e in empresas %}
-                                    <option value="{{ e[0] }}">{{ e[1] }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Tipo de Riesgo</label>
-                                <select class="form-select" name="id_tipo_riesgo" id="modal_tipo" required>
-                                    <option value="">-- Seleccione empresa primero --</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Marca</label>
-                                <select class="form-select" name="id_marca" required>
-                                    {% for m in marcas %}
-                                    <option value="{{ m[0] }}">{{ m[1] }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Modelo (opcional - dejar vacío para toda la marca)</label>
-                                <select class="form-select" name="id_modelo">
-                                    <option value="">-- Toda la marca --</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Año inicio (opcional)</label>
-                                <input type="number" class="form-control" name="anio_inicio" placeholder="Ej: 2020">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Año fin (opcional)</label>
-                                <input type="number" class="form-control" name="anio_fin" placeholder="Ej: 2025">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Suma mínima (opcional)</label>
-                                <input type="number" step="0.01" class="form-control" name="suma_min" placeholder="Ej: 50000">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Suma máxima (opcional)</label>
-                                <input type="number" step="0.01" class="form-control" name="suma_max" placeholder="Ej: 100000">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Nota / Descripción de la regla</label>
-                                <textarea class="form-control" name="nota_regla" rows="3"></textarea>
-                            </div>
-                        </div>
-                        <div class="mt-4">
-                            <button type="submit" class="btn btn-primary">Guardar Regla</button>
-                        </div>
-                    </form>
-                </div>
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nueva Regla de Clasificación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <form action="{{ url_for('clasificador.agregar_regla') }}" method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Empresa</label>
+                            <select class="form-select" name="id_empresa" id="modal_empresa" required>
+                                {% for e in empresas %}
+                                <option value="{{ e[0] }}">{{ e[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Riesgo</label>
+                            <select class="form-select" name="id_tipo_riesgo" id="modal_tipo" required>
+                                <option value="">-- Seleccione empresa primero --</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkMarcaNueva">
+                                <label class="form-check-label">La marca aún no existe en BD</label>
+                            </div>
+                        </div>
+                        <div id="divMarcaExistente" class="col-md-6">
+                            <label class="form-label">Marca existente</label>
+                            <select class="form-select" name="id_marca" id="modal_marca">
+                                {% for m in marcas %}
+                                <option value="{{ m[0] }}">{{ m[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="divMarcaNueva" class="col-md-6" style="display:none;">
+                            <label class="form-label">Nombre de la nueva marca</label>
+                            <input type="text" class="form-control" name="nombre_marca_nueva"
+                                   placeholder="Ej: Ferrari">
+                            <small class="text-muted">La regla quedará pendiente hasta que se agregue esta marca.</small>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkModeloNuevo">
+                                <label class="form-check-label">Especificar modelo (dejar sin marcar = toda la marca)</label>
+                            </div>
+                        </div>
+                        <div id="divModeloOpciones" style="display:none;" class="col-12">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label">Modelo existente</label>
+                                    <select class="form-select" name="id_modelo" id="modal_modelo">
+                                        <option value="">-- Toda la marca --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">O escribir modelo nuevo</label>
+                                    <input type="text" class="form-control" name="nombre_modelo_nuevo"
+                                           placeholder="Ej: 488 Spider">
+                                    <small class="text-muted">Si no existe, se guardará como excepción pendiente.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Año inicio (opcional)</label>
+                            <input type="number" class="form-control" name="anio_inicio" placeholder="Ej: 2005">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Año fin (opcional)</label>
+                            <input type="number" class="form-control" name="anio_fin" placeholder="Ej: 2025">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Suma mínima (opcional)</label>
+                            <input type="number" step="0.01" class="form-control" name="suma_min">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Suma máxima (opcional)</label>
+                            <input type="number" step="0.01" class="form-control" name="suma_max">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Nota / Descripción</label>
+                            <textarea class="form-control" name="nota_regla" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">Guardar Regla</button>
+                    </div>
+                </form>
+            </div>
+        </div></div>
     </div>
 
-    <!-- MODAL EXCEPCIONES -->
+
+    <!-- ===== MODAL EXCEPCIONES ===== -->
     <div class="modal fade" id="modalExcepciones" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Excepciones para la Regla #<span id="ex_id_regla"></span></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="formExcepcion" action="{{ url_for('agregar_excepcion') }}" method="POST">
-                        <input type="hidden" name="id_riesgo_vehiculo" id="ex_id_riesgo">
-
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label">Modelo (escribe parte del nombre)</label>
-                                <input type="text" class="form-control" name="texto_modelo" placeholder="Ej: R8, 116i, Sentra, Festiva" required>
-                                <small class="text-muted">Se buscarán todos los modelos que contengan este texto (ej: "116i" encontrará "116i joy", "116i (130hp)", etc.)</small>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Acción</label>
-                                <select class="form-select" name="tipo_excepcion" required>
-                                    <option value="EXCLUIR">Excluir estos modelos</option>
-                                    <option value="INCLUIR_SOLO">Incluir SOLO estos modelos</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Tipo de Riesgo Alternativo</label>
-                                <select class="form-select" name="id_tipo_riesgo_alternativo" id="select_tipo_alternativo">
-                                    <option value="">-- Usar riesgo por defecto --</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Nota de excepción (opcional)</label>
-                                <input type="text" class="form-control" name="nota_excepcion" placeholder="Ej: Excluir por ser R8">
-                            </div>
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Excepciones — Regla #<span id="ex_id_regla"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formExcepcion"
+                      action="{{ url_for('clasificador.agregar_excepcion') }}" method="POST">
+                    <!--
+                        CORREGIDO: antes decía name="id_riesgo_vehiculo"
+                        Ahora coincide con lo que lee clasificador.py:
+                        request.form['id_regla_clasificacion']
+                    -->
+                    <input type="hidden" name="id_regla_clasificacion" id="ex_id_regla_hidden">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Inicio del nombre del modelo</label>
+                            <input type="text" class="form-control" name="texto_modelo"
+                                   placeholder="Ej: R8, Sentra, Festiva" required>
+                            <small class="text-muted">
+                                Se aplicará a modelos cuyo nombre comience con este texto.
+                                Si el modelo no existe aún, quedará guardado como pendiente.
+                            </small>
                         </div>
-                        <div class="mt-4">
-                            <button type="submit" class="btn btn-primary">Agregar Excepción</button>
+                        <div class="col-md-6">
+                            <label class="form-label">Acción</label>
+                            <select class="form-select" name="tipo_excepcion" required>
+                                <option value="EXCLUIR">Excluir → riesgo alternativo</option>
+                                <option value="INCLUIR_SOLO">Incluir SOLO estos modelos</option>
+                            </select>
                         </div>
-                    </form>
+                        <div class="col-md-6">
+                            <label class="form-label">Riesgo Alternativo</label>
+                            <select class="form-select" name="id_tipo_riesgo_alternativo"
+                                    id="select_tipo_alternativo">
+                                <option value="">-- Mismo riesgo de la regla --</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Nota (opcional)</label>
+                            <input type="text" class="form-control" name="nota_excepcion">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">Agregar Excepción</button>
+                    </div>
+                </form>
 
-                    <h6 class="mt-4">Excepciones actuales de esta regla</h6>
-                    <div id="lista_excepciones" class="mt-2"></div>
+                <hr class="my-4">
+                <h6 class="mb-3">Excepciones actuales</h6>
+                <div id="lista_excepciones">
+                    <p class="text-muted">Cargando...</p>
                 </div>
             </div>
-        </div>
+        </div></div>
     </div>
 
 </div>
 {% endblock %}
 
+
 {% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-
-
-// Cargar tipos de riesgo al cambiar empresa en el filtro superior
+// ── Filtros ───────────────────────────────────────────────────────────────────
 $('#filtro_empresa').change(function() {
-    const empresaId = $(this).val();
-    const selectTipo = $('#filtro_tipo');
-
-    // Limpiar y poner opción por defecto
-    selectTipo.html('<option value="">-- Todos --</option>');
-
-    if (empresaId) {
-        $.getJSON(`/api/tipos_riesgo_por_empresa/${empresaId}`, function(data) {
-            $.each(data, function(i, tipo) {
-                selectTipo.append($('<option>').val(tipo.id).text(tipo.nombre));
-            });
-        }).fail(function() {
-            selectTipo.html('<option value="">Error al cargar tipos</option>');
-        });
-    }
+    const id = $(this).val(), sel = $('#filtro_tipo');
+    sel.html('<option value="">-- Todos --</option>');
+    if (id) $.getJSON(`/api/tipos_riesgo_por_empresa/${id}`,
+        data => data.forEach(t => sel.append($('<option>').val(t.id).text(t.nombre))));
 });
+function limpiarFiltros() {
+    window.location.href = "{{ url_for('clasificador.clasificador_riesgos') }}";
+}
 
-
-// Tipo de Riesgo dinámico en el modal Nueva Regla
+// ── Modal nueva regla ─────────────────────────────────────────────────────────
 $('#modal_empresa').change(function() {
-    const empresaId = $(this).val();
-    const selectTipo = $('#modal_tipo');
-
-    selectTipo.html('<option value="">-- Seleccione empresa primero --</option>');
-
-    if (empresaId) {
-        $.getJSON(`/api/tipos_riesgo_por_empresa/${empresaId}`, function(data) {
-            $.each(data, function(i, tipo) {
-                selectTipo.append($('<option>').val(tipo.id).text(tipo.nombre));
-            });
-        });
-    }
+    const id = $(this).val(), sel = $('#modal_tipo');
+    sel.html('<option value="">-- Seleccione empresa --</option>');
+    if (id) $.getJSON(`/api/tipos_riesgo_por_empresa/${id}`,
+        data => data.forEach(t => sel.append($('<option>').val(t.id).text(t.nombre))));
 });
 
-// Abrir modal de excepciones y cargar tipos de riesgo de la empresa de la regla
+$('#chkMarcaNueva').change(function() {
+    $('#divMarcaExistente').toggle(!this.checked);
+    $('#divMarcaNueva').toggle(this.checked);
+    $('#modal_modelo').html('<option value="">-- Toda la marca --</option>');
+});
+
+$('#chkModeloNuevo').change(function() {
+    $('#divModeloOpciones').toggle(this.checked);
+});
+
+$('#modal_marca').change(function() {
+    const id = $(this).val(), sel = $('#modal_modelo');
+    sel.html('<option value="">-- Toda la marca --</option>');
+    if (id) $.getJSON(`/api/modelos_por_marca/${id}`,
+        data => data.forEach(m => sel.append($('<option>').val(m.id).text(m.nombre))));
+});
+
+// ── SweetAlert eliminar regla ─────────────────────────────────────────────────
+$('.delete-regla').on('submit', function(e) {
+    e.preventDefault();
+    const f = this;
+    Swal.fire({
+        title: '¿Eliminar regla?',
+        text: 'Se eliminarán también todas sus excepciones y pendientes.',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#d33', confirmButtonText: 'Sí, eliminar'
+    }).then(r => { if (r.isConfirmed) f.submit(); });
+});
+
+$('.delete-regla-pend').on('submit', function(e) {
+    e.preventDefault();
+    const f = this;
+    Swal.fire({
+        title: '¿Eliminar regla pendiente?',
+        text: 'No se aplicará cuando se cree la marca.',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#d33', confirmButtonText: 'Sí, eliminar'
+    }).then(r => { if (r.isConfirmed) f.submit(); });
+});
+
+// ── Modal excepciones ─────────────────────────────────────────────────────────
 function verExcepciones(idRegla, empresaId) {
     $('#ex_id_regla').text(idRegla);
-    $('#ex_id_riesgo').val(idRegla);
+    // CORREGIDO: antes llenaba #ex_id_riesgo, ahora llena #ex_id_regla_hidden
+    $('#ex_id_regla_hidden').val(idRegla);
 
-    const selectTipo = $('#select_tipo_alternativo');
-    selectTipo.html('<option value="">-- Usar riesgo por defecto --</option>');
-
+    const sel = $('#select_tipo_alternativo');
+    sel.html('<option value="">-- Mismo riesgo de la regla --</option>');
     if (empresaId) {
-        $.getJSON(`/api/tipos_riesgo_por_empresa/${empresaId}`, function(data) {
-            $.each(data, function(i, tipo) {
-                selectTipo.append($('<option>').val(tipo.id).text(tipo.nombre));
-            });
-            // Agregar siempre la opción NO ASEGURABLE
-            selectTipo.append($('<option>').val('0').text('🚫 NO ASEGURABLE (sin cobertura)'));
-        }).fail(function() {
-            selectTipo.append($('<option>').val('0').text('🚫 NO ASEGURABLE (sin cobertura)'));
-        });
+        $.getJSON(`/api/tipos_riesgo_por_empresa/${empresaId}`, data => {
+            data.forEach(t => sel.append($('<option>').val(t.id).text(t.nombre)));
+            sel.append($('<option>').val('0').text('🚫 No Asegurable'));
+        }).fail(() => sel.append($('<option>').val('0').text('🚫 No Asegurable')));
     } else {
-        // Si no hay empresa_id, al menos mostrar la opción No Asegurable
-        selectTipo.append($('<option>').val('0').text('🚫 NO ASEGURABLE (sin cobertura)'));
+        sel.append($('<option>').val('0').text('🚫 No Asegurable'));
     }
 
+    cargarExcepciones(idRegla);
     $('#modalExcepciones').modal('show');
 }
 
-function limpiarFiltros() {
-    window.location.href = "{{ url_for('clasificador_riesgos') }}";
+function cargarExcepciones(idRegla) {
+    const lista = $('#lista_excepciones');
+    lista.html('<p class="text-muted">Cargando...</p>');
+    $.getJSON(`/api/excepciones_por_regla/${idRegla}`, data => {
+        lista.empty();
+        if (!data.length) {
+            lista.html('<p class="text-muted fst-italic">Sin excepciones registradas.</p>');
+            return;
+        }
+        data.forEach(ex => {
+            const esPend    = ex.tipo === 'pendiente';
+            const badgePend = esPend ? '<span class="badge bg-warning text-dark ms-1">⏳ Pendiente</span>' : '';
+            const delUrl    = esPend
+                ? `/clasificador_riesgos/eliminar_excepcion_pendiente/${ex.id}`
+                : `/clasificador_riesgos/eliminar_excepcion/${ex.id}`;
+            const delClass  = esPend ? 'delete-exc-pend' : 'delete-exc';
+            lista.append(`
+                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2
+                            ${esPend ? 'border-warning bg-warning bg-opacity-10' : ''}">
+                    <div>
+                        <strong>${ex.modelo}</strong>${badgePend}
+                        <span class="badge bg-secondary ms-1">${ex.accion}</span>
+                        <span class="badge bg-info text-dark ms-1">${ex.riesgo}</span>
+                        ${ex.nota ? `<small class="text-muted ms-2">${ex.nota}</small>` : ''}
+                    </div>
+                    <form action="${delUrl}" method="POST" class="${delClass} ms-2">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">✕</button>
+                    </form>
+                </div>
+            `);
+        });
+
+        $('.delete-exc').off('submit').on('submit', function(e) {
+            e.preventDefault(); const f = this;
+            Swal.fire({ title:'¿Eliminar excepción?', icon:'warning',
+                showCancelButton:true, confirmButtonColor:'#d33',
+                confirmButtonText:'Sí, eliminar'
+            }).then(r => { if (r.isConfirmed) f.submit(); });
+        });
+        $('.delete-exc-pend').off('submit').on('submit', function(e) {
+            e.preventDefault(); const f = this;
+            Swal.fire({ title:'¿Eliminar excepción pendiente?',
+                text:'No se aplicará a modelos futuros.',
+                icon:'warning', showCancelButton:true,
+                confirmButtonColor:'#d33', confirmButtonText:'Sí, eliminar'
+            }).then(r => { if (r.isConfirmed) f.submit(); });
+        });
+    }).fail(() => lista.html('<p class="text-danger">Error al cargar excepciones.</p>'));
 }
 </script>
-
-
-
-
-
-
-
-
-
-
-
 {% endblock %}

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Coberturas por Empresa — MAVAC{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.cob-tabs          { display:flex; gap:6px; margin-bottom:0; flex-wrap:wrap; }
+.cob-tab-btn       { padding:8px 18px; border:2px solid #dee2e6; border-bottom:none;
+                     border-radius:8px 8px 0 0; background:#f8f9fa; font-weight:600;
+                     font-size:.88rem; cursor:pointer; color:#555; transition:all .2s; }
+.cob-tab-btn:hover { background:#e8f0fe; color:#00489a; border-color:#b8d0f8; }
+.cob-tab-btn.active{ background:#fff; color:#00489a; border-color:#00489a;
+                     border-bottom-color:#fff; position:relative; z-index:2; }
+
+.cob-panel         { display:none; background:#fff; border:2px solid #00489a;
+                     border-radius:0 8px 8px 8px; padding:28px 32px;
+                     box-shadow:0 2px 12px rgba(0,72,154,.08); }
+.cob-panel.active  { display:block; }
+
+/* ── Grupos de campos ────────────────────────────────────────────────────── */
+.cob-grupo         { margin-bottom:24px; }
+.cob-grupo-titulo  { font-size:.75rem; font-weight:700; text-transform:uppercase;
+                     letter-spacing:.08em; color:#00489a; padding:6px 0;
+                     border-bottom:2px solid #e8f0fe; margin-bottom:14px; }
+
+.cob-field         { display:flex; align-items:center; gap:12px;
+                     padding:8px 10px; border-radius:6px; margin-bottom:6px;
+                     transition:background .15s; }
+.cob-field:hover   { background:#f8f9ff; }
+.cob-field label   { flex:0 0 240px; font-size:.88rem; color:#444;
+                     font-weight:500; margin:0; }
+.cob-field input   { flex:1; border:1px solid #dee2e6; border-radius:6px;
+                     padding:7px 12px; font-size:.88rem; transition:border .2s; }
+.cob-field input:focus { border-color:#00489a; outline:none;
+                         box-shadow:0 0 0 3px rgba(0,72,154,.1); }
+.cob-field input.vacio { border-color:#ffc107; background:#fffde7; }
+
+/* ── Barra de estado ─────────────────────────────────────────────────────── */
+.cob-status        { display:flex; align-items:center; justify-content:space-between;
+                     padding:10px 16px; border-radius:6px; margin-bottom:20px;
+                     font-size:.88rem; }
+.cob-status.ok     { background:#d4edda; color:#155724; }
+.cob-status.warn   { background:#fff3cd; color:#856404; }
+.cob-status.empty  { background:#f8d7da; color:#721c24; }
+
+/* ── Botón guardar ───────────────────────────────────────────────────────── */
+.btn-guardar-cob   { background:#00489a; color:#fff; border:none; padding:10px 28px;
+                     border-radius:8px; font-weight:600; font-size:.95rem;
+                     cursor:pointer; transition:background .2s; }
+.btn-guardar-cob:hover { background:#003278; }
+
+/* ── Badge empresa ───────────────────────────────────────────────────────── */
+.empresa-badge     { display:inline-block; padding:3px 10px; border-radius:12px;
+                     font-size:.78rem; font-weight:700; margin-left:8px; }
+.badge-rimac       { background:#1a6fc4; color:#fff; }
+.badge-pacifico    { background:#003087; color:#fff; }
+.badge-mapfre      { background:#c8102e; color:#fff; }
+.badge-lapositiva  { background:#009b4e; color:#fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <h2 class="text-primary fw-bold mb-1">Coberturas por Empresa</h2>
+    <p class="text-muted mb-4">
+        Administra los valores fijos de coberturas, servicios y deducibles de cada aseguradora.
+        Estos datos aparecen en el documento de cotización.
+    </p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show">
+            {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}{% endif %}
+    {% endwith %}
+
+    <!-- ── TABS POR EMPRESA ── -->
+    <div class="cob-tabs">
+        {% for emp in empresas %}
+        <button class="cob-tab-btn {% if loop.first %}active{% endif %}"
+                onclick="cambiarTab({{ emp[0] }}, this)">
+            {{ emp[1] }}
+            {% set cob = coberturas_dict.get(emp[0]) %}
+            {% if cob %}
+                <span class="empresa-badge badge-{{ emp[1]|lower|replace(' ','') }}">✓ Configurado</span>
+            {% else %}
+                <span class="empresa-badge" style="background:#dc3545;color:#fff;">⚠ Vacío</span>
+            {% endif %}
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- ── PANEL POR EMPRESA ── -->
+    {% for emp in empresas %}
+    {% set id_emp = emp[0] %}
+    {% set nombre_emp = emp[1] %}
+    {% set cob = coberturas_dict.get(id_emp, {}) %}
+
+    <div class="cob-panel {% if loop.first %}active{% endif %}" id="panel_{{ id_emp }}">
+
+        <!-- Estado del panel -->
+        {% if cob %}
+        <div class="cob-status ok">
+            ✅ Coberturas configuradas para <strong>{{ nombre_emp }}</strong>
+            {% if cob.get('ultima_actualizacion') %}
+            — Última actualización: {{ cob.ultima_actualizacion }}
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="cob-status empty">
+            ⚠️ <strong>{{ nombre_emp }}</strong> no tiene coberturas configuradas.
+            Completa los campos y guarda.
+        </div>
+        {% endif %}
+
+        <form action="{{ url_for('coberturas.guardar_coberturas', id_empresa=id_emp) }}" method="POST">
+
+            {% for nombre_grupo, campos_grupo in grupos %}
+            <div class="cob-grupo">
+                <div class="cob-grupo-titulo">{{ nombre_grupo }}</div>
+
+                {% for campo_id, label, placeholder in campos %}
+                    {% if campo_id in campos_grupo %}
+                    <div class="cob-field">
+                        <label for="{{ campo_id }}_{{ id_emp }}">{{ label }}</label>
+                        <input type="text"
+                               id="{{ campo_id }}_{{ id_emp }}"
+                               name="{{ campo_id }}"
+                               value="{{ cob.get(campo_id, '') or '' }}"
+                               placeholder="{{ placeholder }}"
+                               class="{{ 'vacio' if not cob.get(campo_id) else '' }}">
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            <div class="d-flex align-items-center gap-3 mt-3">
+                <button type="submit" class="btn-guardar-cob">
+                    💾 Guardar coberturas de {{ nombre_emp }}
+                </button>
+                <small class="text-muted">
+                    Los campos vacíos aparecerán como "—" en el documento de cotización.
+                </small>
+            </div>
+        </form>
+    </div>
+    {% endfor %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function cambiarTab(idEmpresa, btn) {
+    document.querySelectorAll('.cob-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.cob-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel_' + idEmpresa).classList.add('active');
+}
+
+// Marcar campos vacíos en tiempo real
+document.querySelectorAll('.cob-field input').forEach(inp => {
+    inp.addEventListener('input', function() {
+        this.classList.toggle('vacio', !this.value.trim());
+    });
+});
+</script>
+{% endblock %}

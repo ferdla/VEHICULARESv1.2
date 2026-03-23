@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Cotizacion Vehiculares{% endblock %}
 
 {% block content %}
@@ -8,15 +7,15 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
             {% endfor %}
         {% endif %}
     {% endwith %}
 
-    <!-- ==================== SECCIÓN EMPRESAS ==================== -->
+    <!-- EMPRESAS -->
     <div class="bg-white shadow rounded mb-5 p-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="text-primary mb-0">Empresas</h2>
@@ -54,7 +53,7 @@
         </div>
     </div>
 
-    <!-- ==================== SECCIÓN TIPOS DE RIESGO ==================== -->
+    <!-- TIPOS DE RIESGO -->
     <div class="bg-white shadow rounded mb-5 p-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="text-primary mb-0">Tipos de Riesgo</h2>
@@ -76,13 +75,15 @@
                     {% for tr in tipo_riesgo %}
                     <tr>
                         <td class="text-center">{{ tr[0] }}</td>
-                        <td class="fw-semibold text-center"">{{ tr[1] }}</td>
-                        <td class="text-dark text-center"">{{ tr[2] }}</td>
+                        <td class="fw-semibold text-center">{{ tr[1] }}</td>
+                        <td class="text-dark text-center">{{ tr[2] }}</td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditarTipoRiesgo{{ tr[0] }}">
+                            <button type="button" class="btn btn-warning btn-sm"
+                                    data-bs-toggle="modal" data-bs-target="#modalEditarTipoRiesgo{{ tr[0] }}">
                                 Editar
                             </button>
-                            <form action="{{ url_for('eliminar_tipo_riesgo', id=tr[0]) }}" method="POST" class="delete-form d-inline">
+                            <form action="{{ url_for('index.eliminar_tipo_riesgo', id=tr[0]) }}"
+                                  method="POST" class="delete-form d-inline">
                                 <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
                             </form>
                         </td>
@@ -93,7 +94,7 @@
         </div>
     </div>
 
-    <!-- ==================== SECCIÓN ASIGNACIONES ==================== -->
+    <!-- ASIGNACIONES -->
     <div class="bg-white shadow rounded mb-5 p-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="text-primary mb-0">Asignaciones de Riesgos a Empresas</h2>
@@ -124,10 +125,12 @@
                             </div>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditarAsignacion{{ a[0] }}_{{ a[2] }}">
+                            <button type="button" class="btn btn-warning btn-sm"
+                                    data-bs-toggle="modal" data-bs-target="#modalEditarAsignacion{{ a[0] }}_{{ a[2] }}">
                                 Editar Activo
                             </button>
-                            <form action="{{ url_for('eliminar_asignacion', id_empresa=a[0], id_tipo_riesgo=a[2]) }}" method="POST" class="delete-form d-inline">
+                            <form action="{{ url_for('index.eliminar_asignacion', id_empresa=a[0], id_tipo_riesgo=a[2]) }}"
+                                  method="POST" class="delete-form d-inline">
                                 <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
                             </form>
                         </td>
@@ -138,141 +141,130 @@
         </div>
     </div>
 
-    <!-- ==================== MODALES (sin cambios) ==================== -->
     <!-- Modal Agregar Empresa -->
     <div class="modal fade" id="modalAgregarEmpresa" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-primary">Agregar Empresa</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ url_for('agregar_empresa') }}" method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Nombre</label>
-                            <input type="text" class="form-control" name="nombre_empresa" required>
-                        </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" name="activo" checked>
-                            <label class="form-check-label">Activo</label>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Guardar</button>
-                    </form>
-                </div>
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Agregar Empresa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <form action="{{ url_for('index.agregar_empresa') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" name="nombre_empresa" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="activo" checked>
+                        <label class="form-check-label">Activo</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </form>
+            </div>
+        </div></div>
     </div>
 
     <!-- Modal Agregar Tipo de Riesgo -->
     <div class="modal fade" id="modalAgregarTipoRiesgo" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-primary">Agregar Tipo de Riesgo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ url_for('agregar_tipo_riesgo') }}" method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Nombre</label>
-                            <input type="text" class="form-control" name="nombre_riesgo" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Código Interno</label>
-                            <input type="text" class="form-control" name="codigo_interno">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Guardar</button>
-                    </form>
-                </div>
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Agregar Tipo de Riesgo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <form action="{{ url_for('index.agregar_tipo_riesgo') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" name="nombre_riesgo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Código Interno</label>
+                        <input type="text" class="form-control" name="codigo_interno">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </form>
+            </div>
+        </div></div>
     </div>
 
     <!-- Modales Editar Tipo de Riesgo -->
     {% for tr in tipo_riesgo %}
     <div class="modal fade" id="modalEditarTipoRiesgo{{ tr[0] }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-primary">Editar Tipo de Riesgo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ url_for('editar_tipo_riesgo', id=tr[0]) }}" method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Nombre</label>
-                            <input type="text" class="form-control" name="nombre_riesgo" value="{{ tr[1] }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Código Interno</label>
-                            <input type="text" class="form-control" name="codigo_interno" value="{{ tr[2] }}">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Actualizar</button>
-                    </form>
-                </div>
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Editar Tipo de Riesgo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <form action="{{ url_for('index.editar_tipo_riesgo', id=tr[0]) }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" name="nombre_riesgo" value="{{ tr[1] }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Código Interno</label>
+                        <input type="text" class="form-control" name="codigo_interno" value="{{ tr[2] }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                </form>
+            </div>
+        </div></div>
     </div>
     {% endfor %}
 
     <!-- Modal Agregar Asignación -->
     <div class="modal fade" id="modalAgregarAsignacion" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-primary">Agregar Asignación</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ url_for('agregar_asignacion') }}" method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Empresa</label>
-                            <select class="form-select" name="id_empresa" required>
-                                {% for e in empresas %}
-                                <option value="{{ e[0] }}">{{ e[1] }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Tipo de Riesgo</label>
-                            <select class="form-select" name="id_tipo_riesgo" required>
-                                {% for tr in tipo_riesgo %}
-                                <option value="{{ tr[0] }}">{{ tr[1] }} ({{ tr[2] }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" name="activo" checked>
-                            <label class="form-check-label">Activo</label>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Guardar</button>
-                    </form>
-                </div>
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Agregar Asignación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <form action="{{ url_for('index.agregar_asignacion') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Empresa</label>
+                        <select class="form-select" name="id_empresa" required>
+                            {% for e in empresas %}
+                            <option value="{{ e[0] }}">{{ e[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Riesgo</label>
+                        <select class="form-select" name="id_tipo_riesgo" required>
+                            {% for tr in tipo_riesgo %}
+                            <option value="{{ tr[0] }}">{{ tr[1] }} ({{ tr[2] }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="activo" checked>
+                        <label class="form-check-label">Activo</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </form>
+            </div>
+        </div></div>
     </div>
 
     <!-- Modales Editar Asignación -->
     {% for a in asignaciones %}
     <div class="modal fade" id="modalEditarAsignacion{{ a[0] }}_{{ a[2] }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-primary">Editar Activo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ url_for('editar_asignacion', id_empresa=a[0], id_tipo_riesgo=a[2]) }}" method="POST">
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" name="activo" {{ 'checked' if a[5] == 1 else '' }}>
-                            <label class="form-check-label">Activo</label>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Actualizar</button>
-                    </form>
-                </div>
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Editar Activo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <form action="{{ url_for('index.editar_asignacion', id_empresa=a[0], id_tipo_riesgo=a[2]) }}" method="POST">
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="activo" {{ 'checked' if a[5] == 1 else '' }}>
+                        <label class="form-check-label">Activo</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                </form>
+            </div>
+        </div></div>
     </div>
     {% endfor %}
 
@@ -282,50 +274,36 @@
 {% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
 <script>
-// Auto-ocultar alertas
-setTimeout(function() {
-    $('.alert').fadeOut('slow');
-}, 2500);
+setTimeout(function() { $('.alert').fadeOut('slow'); }, 2500);
 
-// Actualizar empresa inline
 $('.update-empresa').on('click', function() {
-    var row = $(this).closest('tr');
-    var id = row.data('id');
-    var nombre = row.find('[data-field="nombre_empresa"]').text().trim();
-    var activo = row.find('.activo-switch').is(':checked') ? 1 : 0;
+    const row    = $(this).closest('tr');
+    const id     = row.data('id');
+    const nombre = row.find('[data-field="nombre_empresa"]').text().trim();
+    const activo = row.find('.activo-switch').is(':checked') ? 1 : 0;
 
     $.post('/editar_empresa/' + id, { nombre_empresa: nombre, activo: activo })
         .done(function(response) {
-            if (response.success) {
-                location.reload();
-            } else {
-                Swal.fire('Error', response.error || 'No se pudo actualizar', 'error');
-            }
+            if (response.success) { location.reload(); }
+            else { Swal.fire('Error', response.error || 'No se pudo actualizar', 'error'); }
         });
 });
 
-// SweetAlert para eliminar
 $('.delete-form').on('submit', function(e) {
     e.preventDefault();
-    var form = this;
+    const form = this;
     Swal.fire({
         title: '¿Estás seguro?',
-        text: "Esta acción no se puede deshacer",
+        text: 'Esta acción no se puede deshacer',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#3085d6',
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            form.submit();
-        }
-    });
+    }).then(result => { if (result.isConfirmed) form.submit(); });
 });
 </script>
 {% endblock %}

@@ -1,174 +1,522 @@
 {% extends "base.html" %}
+{% block title %}Cotizador Vehicular — MAVAC{% endblock %}
 
-{% block title %}Cotizador Vehicular{% endblock %}
+{% block extra_head %}
+<style>
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.cotizador-wrap   { max-width: 860px; margin: 0 auto; }
+.step-card        { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.08);
+                    padding: 28px 32px; margin-bottom: 24px; }
+.step-title       { font-size: 1rem; font-weight: 700; color: #00489a;
+                    text-transform: uppercase; letter-spacing: .05em;
+                    margin-bottom: 20px; padding-bottom: 10px;
+                    border-bottom: 2px solid #e8f0fe; }
+
+/* ── Valor estimado ─────────────────────────────────────────────────────── */
+.valor-badge      { display:inline-flex; align-items:center; gap:8px;
+                    background:#e8f0fe; border-radius:8px; padding:10px 16px;
+                    font-size:1.05rem; font-weight:600; color:#00489a; }
+.valor-fuente     { font-size:.78rem; color:#666; margin-top:4px; }
+.valor-editable   { border:none; background:transparent; font-size:1.05rem;
+                    font-weight:700; color:#00489a; width:130px;
+                    outline:none; text-align:right; }
+.valor-editable:focus { background:#fff; border-bottom:2px solid #00489a; border-radius:0; }
+
+/* ── Tabla comparativa ──────────────────────────────────────────────────── */
+.tabla-resultado  { width:100%; border-collapse:separate; border-spacing:0; margin-top:8px; }
+.tabla-resultado th { background:#00489a; color:#fff; padding:11px 14px;
+                      font-size:.82rem; text-transform:uppercase; letter-spacing:.04em; }
+.tabla-resultado th:first-child { border-radius:8px 0 0 0; }
+.tabla-resultado th:last-child  { border-radius:0 8px 0 0; }
+.tabla-resultado td { padding:12px 14px; border-bottom:1px solid #f0f0f0;
+                      font-size:.93rem; vertical-align:middle; }
+.tabla-resultado tr:last-child td { border-bottom:none; }
+.tabla-resultado tr:hover td     { background:#f8f9ff; }
+
+.badge-riesgo   { display:inline-block; padding:3px 10px; border-radius:20px;
+                  font-size:.78rem; font-weight:600; }
+.badge-br1      { background:#d4edda; color:#155724; }
+.badge-br2      { background:#cce5ff; color:#004085; }
+.badge-br       { background:#d4edda; color:#155724; }
+.badge-mr       { background:#fff3cd; color:#856404; }
+.badge-ar       { background:#f8d7da; color:#721c24; }
+.badge-chh      { background:#e2d9f3; color:#432874; }
+.badge-pk       { background:#d1ecf1; color:#0c5460; }
+.badge-no       { background:#f5f5f5; color:#666; }
+
+.prima-valor    { font-size:1.08rem; font-weight:700; color:#1a7a3f; }
+.prima-na       { color:#aaa; font-style:italic; font-size:.88rem; }
+
+.mejor-precio   { background:#f0fff4 !important; }
+.mejor-precio td { font-weight:600; }
+.corona-icon    { font-size:.85rem; margin-left:4px; }
+
+/* ── Spinner / estados ───────────────────────────────────────────────────── */
+.spinner-overlay { text-align:center; padding:40px;
+                   color:#00489a; font-size:.95rem; }
+.alerta-no-aseg  { background:#fff8e1; border:1px solid #ffe082; border-radius:8px;
+                   padding:14px 18px; color:#7b5e00; font-size:.9rem; }
+
+/* ── Botón generar cotización ────────────────────────────────────────────── */
+.btn-generar     { background: linear-gradient(135deg, #00489a, #0066cc);
+                   color:#fff; border:none; padding:14px 32px;
+                   border-radius:10px; font-size:1rem; font-weight:700;
+                   cursor:pointer; transition:all .2s;
+                   box-shadow: 0 4px 14px rgba(0,72,154,.3); }
+.btn-generar:hover { transform:translateY(-1px);
+                     box-shadow: 0 6px 20px rgba(0,72,154,.4); }
+.btn-generar:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+
+.guardando-overlay { text-align:center; padding:16px;
+                     color:#00489a; font-size:.9rem; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container my-5">
+<div class="container my-4">
+<div class="cotizador-wrap">
 
-    <div class="text-center mb-5">
-        <h1 class="text-primary display-5 fw-bold">Cotización Vehicular</h1>
+    <h2 class="text-primary fw-bold mb-1">Cotización Vehicular</h2>
+    <p class="text-muted mb-4">Compara coberturas de las 4 aseguradoras en un solo paso.</p>
+
+    <!-- ══ PASO 1 — Datos del cliente ══════════════════════════════════════ -->
+    <div class="step-card">
+        <div class="step-title">① Datos del cliente</div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Nombre del cliente / contacto</label>
+                <input type="text" id="inp_cliente" class="form-control"
+                       placeholder="Ej: Juan Pérez">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">DNI / RUC <span class="text-muted">(opcional)</span></label>
+                <input type="text" id="inp_dni" class="form-control"
+                       placeholder="Ej: 12345678">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Placa / descripción</label>
+                <input type="text" id="inp_placa" class="form-control"
+                       placeholder="Ej: ABC-123">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Email <span class="text-muted">(opcional)</span></label>
+                <input type="email" id="inp_email" class="form-control"
+                       placeholder="Ej: cliente@email.com">
+            </div>
+        </div>
     </div>
 
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
+    <!-- ══ PASO 2 — Datos del vehículo ═════════════════════════════════════ -->
+    <div class="step-card">
+        <div class="step-title">② Datos del vehículo</div>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Marca</label>
+                <select id="sel_marca" class="form-select">
+                    <option value="">-- Seleccione --</option>
+                    {% for m in marcas %}
+                    <option value="{{ m[0] }}">{{ m[1] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Modelo</label>
+                <select id="sel_modelo" class="form-select" disabled>
+                    <option value="">-- Primero seleccione marca --</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Año de fabricación</label>
+                <select id="sel_anio" class="form-select" disabled>
+                    <option value="">-- Seleccione modelo --</option>
+                </select>
+            </div>
+        </div>
+    </div>
 
-            <div class="card shadow">
-                <div class="card-body p-5">
+    <!-- ══ PASO 3 — Suma asegurada ═════════════════════════════════════════ -->
+    <div class="step-card" id="card_suma" style="display:none">
+        <div class="step-title">③ Suma asegurada (USD)</div>
 
-                    <!-- Broker -->
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Nombre del Broker</label>
-                        <input type="text" class="form-control form-control-lg" 
-                               value="MAVAC CORREDORES DE SEGUROS S.A.C" readonly>
+        <div id="valor_estimado_wrap" class="mb-3" style="display:none">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div>
+                    <label class="form-label mb-1">Valor estimado del vehículo</label>
+                    <div class="valor-badge">
+                        $&nbsp;<input type="number" id="inp_valor_estimado"
+                               class="valor-editable" min="100" step="100">
                     </div>
-
-                    <!-- Asegurado / Contacto -->
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Asegurado o Contacto</label>
-                        <input type="text" id="asegurado" class="form-control form-control-lg" 
-                               placeholder="Nombre del cliente o contacto">
-                    </div>
-
-                    <!-- Vehículo (placa o descripción) -->
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Vehículo (Placa o Descripción)</label>
-                        <input type="text" id="vehiculo" class="form-control form-control-lg" 
-                               placeholder="Ej: ABC-123 o Toyota Corolla">
-                    </div>
-
-                    <!-- Marca -->
-                    <div class="row">
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label fw-bold">Marca</label>
-                            <select id="marca" class="form-select form-select-lg">
-                                <option value="">-- Seleccione marca --</option>
-                                {% for m in marcas %}
-                                <option value="{{ m[0] }}">{{ m[1] }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- Modelo -->
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label fw-bold">Modelo</label>
-                            <select id="modelo" class="form-select form-select-lg" disabled>
-                                <option value="">-- Primero seleccione marca --</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Año (lista desplegable) -->
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Año del Vehículo</label>
-                        <select id="anio" class="form-select form-select-lg">
-                            <option value="">-- Seleccione año --</option>
-                            {% for a in años %}
-                            <option value="{{ a.value }}">{{ a.label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Botón Calcular -->
-                    <div class="d-grid">
-                        <button onclick="mostrarResumen()" class="btn btn-primary btn-lg">
-                            Ver Resumen y Continuar
-                        </button>
-                    </div>
-
+                    <div class="valor-fuente" id="valor_fuente_texto"></div>
+                </div>
+                <div class="pt-3">
+                    <button class="btn btn-sm btn-outline-secondary"
+                            onclick="usarValorEstimado()">
+                        Usar este valor →
+                    </button>
                 </div>
             </div>
+        </div>
 
-            <!-- RESUMEN -->
-            <div id="resumen" class="card shadow mt-4" style="display:none;">
-                <div class="card-body">
-                    <h4 class="text-primary mb-3">Datos de la Cotización</h4>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <strong>Broker:</strong><br>
-                            <span id="res_broker">MAVAC CORREDORES DE SEGUROS S.A.C</span>
-                        </div>
-                        <div class="col-md-6">
-                            <strong>Asegurado:</strong><br>
-                            <span id="res_asegurado">-</span>
-                        </div>
-                        <div class="col-md-6">
-                            <strong>Vehículo:</strong><br>
-                            <span id="res_vehiculo">-</span>
-                        </div>
-                        <div class="col-md-6">
-                            <strong>Marca:</strong><br>
-                            <span id="res_marca">-</span>
-                        </div>
-                        <div class="col-md-6">
-                            <strong>Modelo:</strong><br>
-                            <span id="res_modelo">-</span>
-                        </div>
-                        <div class="col-md-6">
-                            <strong>Año:</strong><br>
-                            <span id="res_anio">-</span>
-                        </div>
-                    </div>
+        <div class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label">Suma asegurada <span class="text-danger">*</span></label>
+                <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    <input type="number" id="inp_suma" class="form-control"
+                           placeholder="Ej: 15000" min="100" step="100">
+                </div>
+                <div class="form-text">Ingresa el valor en USD a asegurar.</div>
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-primary w-100" onclick="cotizar()">
+                    Cotizar ahora →
+                </button>
+            </div>
+        </div>
+    </div>
 
-                    <div class="text-center mt-4">
-                        <button onclick="continuarCotizacion()" class="btn btn-success btn-lg">
-                            Continuar con la Cotización →
-                        </button>
-                    </div>
+    <!-- ══ RESULTADO ═══════════════════════════════════════════════════════ -->
+    <div id="resultado_wrap" style="display:none">
+
+        <!-- Resumen del vehículo -->
+        <div class="step-card" id="resumen_vehiculo" style="background:#f8f9ff">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <div class="fw-bold fs-5" id="res_marca_modelo"></div>
+                    <div class="text-muted" id="res_cliente"></div>
+                </div>
+                <div class="text-end">
+                    <div class="text-muted small">Suma asegurada</div>
+                    <div class="fw-bold fs-5 text-primary" id="res_suma"></div>
                 </div>
             </div>
+        </div>
 
+        <!-- Tabla comparativa -->
+        <div class="step-card">
+            <div class="step-title">Comparativa de coberturas</div>
+            <div id="tabla_wrap">
+                <div class="spinner-overlay">
+                    <div class="spinner-border spinner-border-sm me-2"></div>
+                    Calculando primas...
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ BOTONES FINALES ══════════════════════════════════════════════ -->
+        <div class="step-card" id="card_acciones" style="display:none">
+            <div class="step-title">④ Generar documento</div>
+
+            <div class="row g-3 align-items-center">
+                <div class="col-md-8">
+                    <p class="text-muted mb-2" style="font-size:.9rem;">
+                        Genera el documento oficial de cotización con todas las coberturas,
+                        tasas y condiciones. Podrás editarlo y descargarlo como PDF.
+                    </p>
+                    <div id="guardando_wrap" style="display:none">
+                        <div class="guardando-overlay">
+                            <div class="spinner-border spinner-border-sm me-2"></div>
+                            Guardando cotización...
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <button id="btn_generar" class="btn-generar" onclick="generarDocumento()">
+                        📄 Generar cotización
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón nueva cotización -->
+        <div class="d-flex gap-2 mb-4">
+            <button class="btn btn-outline-secondary" onclick="nuevaCotizacion()">
+                ← Nueva cotización
+            </button>
         </div>
     </div>
 
 </div>
+</div>
 {% endblock %}
+
 
 {% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script>
-// Cargar modelos al seleccionar marca
-$('#marca').change(function() {
-    const marcaId = $(this).val();
-    const selectModelo = $('#modelo');
+const AÑO_ACTUAL = {{ AÑO_ACTUAL if AÑO_ACTUAL is defined else 2026 }};
 
-    selectModelo.html('<option value="">-- Seleccione modelo --</option>');
-    selectModelo.prop('disabled', true);
+// Guardamos los resultados de la cotización para usarlos al guardar
+let ultimosResultados = [];
+let ultimaData        = {};
 
-    if (marcaId) {
-        $.getJSON(`/api/modelos_por_marca/${marcaId}`, function(data) {
-            $.each(data, function(i, mod) {
-                selectModelo.append($('<option>').val(mod.id).text(mod.nombre));
-            });
-            selectModelo.prop('disabled', false);
-        }).fail(function() {
-            alert('Error al cargar modelos');
-        });
+// ── Generar opciones de años ──────────────────────────────────────────────
+function llenarAnios() {
+    const sel = $('#sel_anio');
+    sel.empty().append('<option value="">-- Seleccione año --</option>');
+    for (let y = AÑO_ACTUAL; y >= 2000; y--) {
+        const label = y === AÑO_ACTUAL ? `${y} (0km)` : String(y);
+        sel.append($('<option>').val(y).text(label));
     }
-});
-
-// Mostrar resumen
-function mostrarResumen() {
-    const broker = "MAVAC CORREDORES DE SEGUROS S.A.C";
-    const asegurado = $('#asegurado').val().trim() || '-';
-    const vehiculo = $('#vehiculo').val().trim() || '-';
-    const marcaText = $('#marca option:selected').text() || '-';
-    const modeloText = $('#modelo option:selected').text() || '-';
-    const anioText = $('#anio option:selected').text() || '-';
-
-    $('#res_broker').text(broker);
-    $('#res_asegurado').text(asegurado);
-    $('#res_vehiculo').text(vehiculo);
-    $('#res_marca').text(marcaText);
-    $('#res_modelo').text(modeloText);
-    $('#res_anio').text(anioText);
-
-    $('#resumen').fadeIn();
+    sel.prop('disabled', false);
 }
 
-function continuarCotizacion() {
-    alert('✅ Datos guardados. Próximo paso: Selección de coberturas y cálculo de prima');
-    // Ejemplo: window.location.href = '/cotizacion-final';
+// ── Marca → Modelos ───────────────────────────────────────────────────────
+$('#sel_marca').change(function() {
+    const id  = $(this).val();
+    const sel = $('#sel_modelo');
+    sel.empty().append('<option value="">-- Cargando... --</option>').prop('disabled', true);
+    $('#sel_anio').prop('disabled', true);
+    $('#card_suma').hide();
+    $('#resultado_wrap').hide();
+    ultimosResultados = [];
+
+    if (!id) { sel.html('<option value="">-- Primero seleccione marca --</option>'); return; }
+    $.getJSON(`/api/modelos_por_marca/${id}`, function(data) {
+        sel.empty().append('<option value="">-- Seleccione modelo --</option>');
+        data.forEach(m => sel.append($('<option>').val(m.id).text(m.nombre)));
+        sel.prop('disabled', false);
+    }).fail(() => sel.html('<option value="">Error al cargar</option>'));
+});
+
+// ── Modelo → Años ─────────────────────────────────────────────────────────
+$('#sel_modelo').change(function() {
+    if (!$(this).val()) return;
+    llenarAnios();
+    $('#card_suma').hide();
+    $('#resultado_wrap').hide();
+    ultimosResultados = [];
+});
+
+// ── Año → Valor estimado ──────────────────────────────────────────────────
+$('#sel_anio').change(function() {
+    const idModelo = $('#sel_modelo').val();
+    const anio     = $(this).val();
+    if (!idModelo || !anio) return;
+
+    $('#card_suma').show();
+    $('#valor_estimado_wrap').hide();
+    $('#inp_suma').val('');
+
+    $.getJSON(`/api/valor_vehiculo?id_modelo=${idModelo}&anio=${anio}`, function(data) {
+        if (data.valor) {
+            $('#inp_valor_estimado').val(data.valor);
+            let fuenteTexto = '';
+            if (data.fuente === 'historico')  fuenteTexto = `📊 Valor histórico del año ${anio}`;
+            else if (data.fuente === 'calculado') fuenteTexto = `🧮 ${data.nota}`;
+            $('#valor_fuente_texto').text(fuenteTexto);
+            $('#valor_estimado_wrap').show();
+        }
+    });
+});
+
+function usarValorEstimado() {
+    const v = $('#inp_valor_estimado').val();
+    if (v) $('#inp_suma').val(v).focus();
+}
+
+// ── Cotizar ───────────────────────────────────────────────────────────────
+function cotizar() {
+    const idModelo = $('#sel_modelo').val();
+    const anio     = parseInt($('#sel_anio').val());
+    const suma     = parseFloat($('#inp_suma').val());
+
+    if (!idModelo) { alert('Selecciona un modelo.'); return; }
+    if (!anio)     { alert('Selecciona el año de fabricación.'); return; }
+    if (!suma || suma <= 0) { alert('Ingresa una suma asegurada válida.'); return; }
+
+    const marcaNombre  = $('#sel_marca option:selected').text();
+    const modeloNombre = $('#sel_modelo option:selected').text();
+    const cliente      = $('#inp_cliente').val().trim();
+    const placa        = $('#inp_placa').val().trim();
+
+    $('#res_marca_modelo').text(`${marcaNombre} ${modeloNombre} ${anio}`);
+    let clienteTexto = cliente || 'Cliente no especificado';
+    if (placa) clienteTexto += ` — ${placa}`;
+    $('#res_cliente').text(clienteTexto);
+    $('#res_suma').text(`$ ${suma.toLocaleString('es-PE', {minimumFractionDigits:2})}`);
+
+    $('#resultado_wrap').show();
+    $('#card_acciones').hide();
+    ultimosResultados = [];
+
+    $('#tabla_wrap').html(`
+        <div class="spinner-overlay">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            Calculando primas para las 4 aseguradoras...
+        </div>
+    `);
+
+    setTimeout(() => {
+        document.getElementById('resultado_wrap').scrollIntoView({behavior:'smooth'});
+    }, 100);
+
+    // Guardar datos para usar al generar documento
+    ultimaData = {
+        id_modelo:        parseInt(idModelo),
+        anio_fabricacion: anio,
+        suma_asegurada:   suma,
+        nombre_cliente:   $('#inp_cliente').val().trim(),
+        dni_ruc:          $('#inp_dni').val().trim(),
+        placa:            $('#inp_placa').val().trim(),
+        email:            $('#inp_email').val().trim(),
+    };
+
+    $.ajax({
+        url: '/api/cotizar',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            id_modelo:        parseInt(idModelo),
+            anio_fabricacion: anio,
+            suma_asegurada:   suma,
+        }),
+        success: function(data) {
+            ultimosResultados = data.resultados;
+            renderTabla(data);
+            // Mostrar sección de generar documento
+            $('#card_acciones').show();
+        },
+        error: function(xhr) {
+            const msg = xhr.responseJSON?.error || 'Error al cotizar.';
+            $('#tabla_wrap').html(`<div class="alert alert-danger">❌ ${msg}</div>`);
+        }
+    });
+}
+
+// ── Renderizar tabla comparativa ──────────────────────────────────────────
+function renderTabla(data) {
+    const resultados = data.resultados;
+    const primasValidas = resultados
+        .filter(r => r.asegurable && r.prima !== null)
+        .map(r => r.prima);
+    const primaMin = primasValidas.length ? Math.min(...primasValidas) : null;
+
+    if (!data.alguna_asegurable) {
+        $('#tabla_wrap').html(`
+            <div class="alerta-no-aseg">
+                ⚠️ <strong>Vehículo no asegurable</strong> — Este vehículo no tiene cobertura
+                en ninguna de las 4 aseguradoras con los datos ingresados.
+                <br><small class="text-muted mt-1 d-block">Verifica las reglas de clasificación en el módulo Clasificador de Riesgos.</small>
+            </div>
+        `);
+        return;
+    }
+
+    let filas = '';
+    resultados.forEach(r => {
+        const esMejor    = r.prima !== null && r.prima === primaMin && primasValidas.length > 1;
+        const clsFila    = esMejor ? 'mejor-precio' : '';
+        const badgeClass = getBadgeClass(r.tipo_riesgo);
+        const badgeRiesgo = `<span class="badge-riesgo ${badgeClass}">${r.tipo_riesgo}</span>`;
+        const tasaTxt    = r.tasa !== null
+            ? `${parseFloat(r.tasa).toFixed(4)}%`
+            : `<span class="prima-na">—</span>`;
+        let primaTxt = '';
+        if (r.prima !== null) {
+            const corona = esMejor ? '<span class="corona-icon"> ✅</span>' : '';
+            primaTxt = `<span class="prima-valor">$ ${r.prima.toLocaleString('es-PE', {minimumFractionDigits:2})}${corona}</span>`;
+        } else if (!r.asegurable) {
+            primaTxt = `<span class="prima-na">No asegurable</span>`;
+        } else {
+            primaTxt = `<span class="prima-na">Sin tasa registrada</span>`;
+        }
+        const detalle = r.detalle.length > 60 ? r.detalle.substring(0,57)+'...' : r.detalle;
+
+        filas += `
+            <tr class="${clsFila}">
+                <td class="fw-semibold">${r.empresa}</td>
+                <td>${badgeRiesgo}</td>
+                <td>${tasaTxt}</td>
+                <td>${primaTxt}</td>
+                <td><small class="text-muted">${detalle}</small></td>
+            </tr>`;
+    });
+
+    let notaPie = '';
+    if (primaMin !== null && primasValidas.length > 1) {
+        notaPie = `<div class="text-muted small mt-2 text-end"> ✅ Prima más baja entre las aseguradoras disponibles</div>`;
+    }
+
+    $('#tabla_wrap').html(`
+        <div class="table-responsive">
+            <table class="tabla-resultado">
+                <thead>
+                    <tr>
+                        <th>Empresa</th><th>Tipo de Riesgo</th>
+                        <th>Tasa</th><th>Prima Anual</th><th>Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>
+        ${notaPie}
+    `);
+}
+
+function getBadgeClass(tipo) {
+    if (!tipo) return 'badge-no';
+    const t = tipo.toLowerCase();
+    if (t.includes('no aseg'))   return 'badge-no';
+    if (t.includes('br1') || (t.includes('bajo') && t.includes('1'))) return 'badge-br1';
+    if (t.includes('br2') || (t.includes('bajo') && t.includes('2'))) return 'badge-br2';
+    if (t.includes('bajo'))      return 'badge-br';
+    if (t.includes('mediano'))   return 'badge-mr';
+    if (t.includes('alto'))      return 'badge-ar';
+    if (t.includes('chino') || t.includes('ch-h')) return 'badge-chh';
+    if (t.includes('pickup') || t.includes('pk'))  return 'badge-pk';
+    return 'badge-no';
+}
+
+// ── Generar documento de cotización ───────────────────────────────────────
+function generarDocumento() {
+    if (!ultimosResultados.length) {
+        alert('Primero realiza una cotización.');
+        return;
+    }
+
+    $('#btn_generar').prop('disabled', true).text('Generando...');
+    $('#guardando_wrap').show();
+
+    const payload = {
+        ...ultimaData,
+        resultados: ultimosResultados,
+    };
+
+    $.ajax({
+        url: '/api/guardar_cotizacion',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function(r) {
+            if (r.ok) {
+                // Redirigir al documento generado
+                window.location.href = `/documento/cotizacion/${r.id_cotizacion}`;
+            } else {
+                alert('Error al guardar: ' + r.error);
+                $('#btn_generar').prop('disabled', false).text('📄 Generar cotización');
+                $('#guardando_wrap').hide();
+            }
+        },
+        error: function() {
+            alert('Error de conexión al guardar.');
+            $('#btn_generar').prop('disabled', false).text('📄 Generar cotización');
+            $('#guardando_wrap').hide();
+        }
+    });
+}
+
+// ── Nueva cotización ──────────────────────────────────────────────────────
+function nuevaCotizacion() {
+    $('#resultado_wrap').hide();
+    $('#card_suma').hide();
+    $('#card_acciones').hide();
+    $('#inp_suma, #inp_cliente, #inp_placa, #inp_dni, #inp_email').val('');
+    $('#sel_marca').val('').trigger('change');
+    ultimosResultados = [];
+    ultimaData = {};
+    window.scrollTo({top: 0, behavior: 'smooth'});
 }
 </script>
 {% endblock %}

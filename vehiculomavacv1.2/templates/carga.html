@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+{% block title %}Carga de Datos — Excel{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <h2 class="text-primary mb-1">Carga de Datos desde Excel</h2>
+    <p class="text-muted mb-4">
+        Sube el archivo <strong>Vehiculares_Precios.xlsx</strong> para cargar marcas, modelos
+        y valores vehiculares automáticamente.
+    </p>
+
+    <!-- ── TABS ── -->
+    <ul class="nav nav-tabs mb-4" id="tabsCarga">
+        <li class="nav-item">
+            <button class="nav-link active" data-tab="marcas_modelos">
+                🚗 Marcas y Modelos
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-tab="valores">
+                💰 Valores Vehiculares
+            </button>
+        </li>
+    </ul>
+
+    <!-- ══════════════════════════════════════════════════════
+         TAB 1 — MARCAS Y MODELOS
+    ══════════════════════════════════════════════════════ -->
+    <div id="tab_marcas_modelos" class="tab-content-panel">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h5 class="mb-3">Cargar Marcas y Modelos</h5>
+                <p class="text-muted small mb-4">
+                    Lee las columnas <strong>Marca</strong> y <strong>Modelo</strong> del Excel
+                    y los agrega al catálogo de vehículos. Si la marca no existe la crea automáticamente.
+                    <br>
+                    <span class="text-warning fw-semibold">⚡</span>
+                    Si hay <strong>reglas o excepciones pendientes</strong> para alguna marca/modelo nuevo,
+                    se aplican automáticamente durante la carga.
+                </p>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Archivo Excel</label>
+                        <input type="file" class="form-control" id="archivo_mm" accept=".xlsx">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Si el modelo ya existe</label>
+                        <select class="form-select" id="accion_mm">
+                            <option value="ignorar">Ignorar (no modificar)</option>
+                            <option value="actualizar">Actualizar</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn btn-outline-primary me-2" onclick="previsualizar('marcas_modelos')">
+                    🔍 Previsualizar
+                </button>
+                <button class="btn btn-primary" id="btn_cargar_mm" style="display:none"
+                        onclick="ejecutarCarga('marcas_modelos')">
+                    ✅ Confirmar y Cargar
+                </button>
+
+                <div id="preview_mm" class="mt-4" style="display:none"></div>
+                <div id="resultado_mm" class="mt-4" style="display:none"></div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════════════════
+         TAB 2 — VALORES VEHICULARES
+    ══════════════════════════════════════════════════════ -->
+    <div id="tab_valores" class="tab-content-panel" style="display:none">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h5 class="mb-3">Cargar Valores Vehiculares</h5>
+                <p class="text-muted small mb-4">
+                    Lee las columnas <strong>VRN</strong> y los <strong>años (2026→2011)</strong>
+                    del Excel e inserta los valores en la tabla <code>valor_vehiculo</code>.
+                    Solo se insertan las celdas que tienen valor (las vacías se ignoran).
+                    <br>
+                    ⚠️ Los modelos deben estar ya cargados en el sistema antes de ejecutar esto.
+                </p>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Archivo Excel</label>
+                        <input type="file" class="form-control" id="archivo_val" accept=".xlsx">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Si el valor ya existe</label>
+                        <select class="form-select" id="accion_val">
+                            <option value="ignorar">Ignorar (mantener el valor actual)</option>
+                            <option value="actualizar">Actualizar con el nuevo valor</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn btn-outline-primary me-2" onclick="previsualizar('valores')">
+                    🔍 Previsualizar
+                </button>
+                <button class="btn btn-primary" id="btn_cargar_val" style="display:none"
+                        onclick="ejecutarCarga('valores')">
+                    ✅ Confirmar y Cargar
+                </button>
+
+                <div id="preview_val" class="mt-4" style="display:none"></div>
+                <div id="resultado_val" class="mt-4" style="display:none"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+$('.nav-link[data-tab]').on('click', function() {
+    $('.nav-link[data-tab]').removeClass('active');
+    $(this).addClass('active');
+    $('.tab-content-panel').hide();
+    $('#tab_' + $(this).data('tab')).show();
+});
+
+// ── Previsualizar ─────────────────────────────────────────────────────────────
+function previsualizar(modo) {
+    const archivoInput = modo === 'marcas_modelos' ? '#archivo_mm' : '#archivo_val';
+    const archivo = $(archivoInput)[0].files[0];
+
+    if (!archivo) {
+        alert('Selecciona un archivo Excel primero.');
+        return;
+    }
+
+    const previewDiv = `#preview_${modo === 'marcas_modelos' ? 'mm' : 'val'}`;
+    const resultDiv  = `#resultado_${modo === 'marcas_modelos' ? 'mm' : 'val'}`;
+    const btnCargar  = `#btn_cargar_${modo === 'marcas_modelos' ? 'mm' : 'val'}`;
+
+    $(previewDiv).html(`
+        <div class="d-flex align-items-center gap-2 text-muted">
+            <div class="spinner-border spinner-border-sm"></div>
+            Analizando archivo...
+        </div>
+    `).show();
+    $(resultDiv).hide();
+    $(btnCargar).hide();
+
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    formData.append('modo', modo);
+
+    $.ajax({
+        url: '/carga/previsualizar',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (!response.ok) {
+                $(previewDiv).html(`<div class="alert alert-danger">❌ ${response.error}</div>`);
+                return;
+            }
+            const r = response.resumen;
+            let html = '';
+
+            if (modo === 'marcas_modelos') {
+                // ── Alertas de pendientes que se resolverán ──────────────
+                const alertaReglas = r.reglas_pendientes_a_resolver > 0 ? `
+                    <div class="alert alert-warning mt-3 mb-0 py-2">
+                        <strong>⚡ ${r.reglas_pendientes_a_resolver} regla(s) pendiente(s)</strong>
+                        se aplicarán automáticamente para las marcas nuevas detectadas.
+                    </div>` : '';
+
+                const alertaExc = r.exc_pendientes_a_resolver > 0 ? `
+                    <div class="alert alert-warning mt-2 mb-0 py-2">
+                        <strong>⚡ ${r.exc_pendientes_a_resolver} excepción(es) pendiente(s)</strong>
+                        se aplicarán automáticamente para los modelos nuevos detectados.
+                    </div>` : '';
+
+                // ── Lista de marcas nuevas ────────────────────────────────
+                const listaMarcas = r.marcas_nuevas_lista.length ? `
+                    <div class="mt-3">
+                        <small class="fw-semibold">Marcas nuevas que se crearán:</small><br>
+                        <small class="text-muted">
+                            ${r.marcas_nuevas_lista.join(', ')}${r.marcas_nuevas > 20 ? '...' : ''}
+                        </small>
+                    </div>` : '';
+
+                // ── Lista de modelos existentes ───────────────────────────
+                const listaExist = r.modelos_exist_lista.length ? `
+                    <div class="mt-2">
+                        <small class="fw-semibold">
+                            Primeros modelos existentes (se ignorarán o actualizarán según tu elección):
+                        </small><br>
+                        <small class="text-muted">${r.modelos_exist_lista.join('<br>')}</small>
+                    </div>` : '';
+
+                html = `
+                    <div class="alert alert-info">
+                        <h6 class="alert-heading">📊 Resumen de lo que se cargará</h6>
+                        <hr>
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <div class="border rounded p-2 text-center bg-white">
+                                    <div class="fs-4 fw-bold text-primary">${r.total_filas}</div>
+                                    <small>Filas en el Excel</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border rounded p-2 text-center bg-white">
+                                    <div class="fs-4 fw-bold text-success">${r.marcas_nuevas}</div>
+                                    <small>Marcas nuevas</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border rounded p-2 text-center bg-white">
+                                    <div class="fs-4 fw-bold text-success">${r.modelos_nuevos}</div>
+                                    <small>Modelos nuevos</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border rounded p-2 text-center bg-white">
+                                    <div class="fs-4 fw-bold text-warning">${r.modelos_existentes}</div>
+                                    <small>Modelos ya existentes</small>
+                                </div>
+                            </div>
+                        </div>
+                        ${alertaReglas}
+                        ${alertaExc}
+                        ${listaMarcas}
+                        ${listaExist}
+                    </div>
+                `;
+
+            } else {
+                // ── Tab valores ───────────────────────────────────────────
+                const sinMatch = r.modelos_sin_match > 0 ? `
+                    <div class="mt-2">
+                        <small class="fw-semibold text-danger">
+                            ⚠️ ${r.modelos_sin_match} modelos no encontrados en BD
+                            (carga primero las marcas y modelos):
+                        </small><br>
+                        <small class="text-muted">
+                            ${r.sin_match_lista.join('<br>')}${r.modelos_sin_match > 15 ? '<br>...' : ''}
+                        </small>
+                    </div>` : '';
+
+                html = `
+                    <div class="alert alert-info">
+                        <h6 class="alert-heading">📊 Resumen de lo que se cargará</h6>
+                        <hr>
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <div class="border rounded p-2 text-center bg-white">
+                                    <div class="fs-4 fw-bold text-success">${r.modelos_con_match}</div>
+                                    <small>Modelos encontrados en BD</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border rounded p-2 text-center bg-white">
+                                    <div class="fs-4 fw-bold text-danger">${r.modelos_sin_match}</div>
+                                    <small>Modelos no encontrados</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border rounded p-2 text-center bg-white">
+                                    <div class="fs-4 fw-bold text-primary">${r.vrn_a_insertar}</div>
+                                    <small>VRN a insertar</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border rounded p-2 text-center bg-white">
+                                    <div class="fs-4 fw-bold text-primary">${r.historicos_a_insertar}</div>
+                                    <small>Históricos a insertar</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                Columna VRN detectada: <strong>${r.vrn_col}</strong> |
+                                Años: <strong>${r.años_detectados.join(', ')}</strong>
+                            </small>
+                        </div>
+                        ${sinMatch}
+                    </div>
+                `;
+            }
+
+            $(previewDiv).html(html);
+            $(btnCargar).show();
+        },
+        error: function() {
+            $(previewDiv).html('<div class="alert alert-danger">❌ Error al conectar con el servidor.</div>');
+        }
+    });
+}
+
+// ── Ejecutar carga ────────────────────────────────────────────────────────────
+function ejecutarCarga(modo) {
+    const archivoInput = modo === 'marcas_modelos' ? '#archivo_mm' : '#archivo_val';
+    const accionSel    = modo === 'marcas_modelos' ? '#accion_mm' : '#accion_val';
+    const resultDiv    = `#resultado_${modo === 'marcas_modelos' ? 'mm' : 'val'}`;
+    const btnCargar    = `#btn_cargar_${modo === 'marcas_modelos' ? 'mm' : 'val'}`;
+
+    const archivo = $(archivoInput)[0].files[0];
+    const accion  = $(accionSel).val();
+
+    if (!archivo) { alert('Selecciona un archivo primero.'); return; }
+
+    $(btnCargar).prop('disabled', true).text('Cargando...');
+    $(resultDiv).html(`
+        <div class="d-flex align-items-center gap-2 text-muted">
+            <div class="spinner-border spinner-border-sm"></div>
+            Procesando... esto puede tardar unos segundos.
+        </div>
+    `).show();
+
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    formData.append('modo', modo);
+    formData.append('accion_duplicado', accion);
+
+    $.ajax({
+        url: '/carga/ejecutar',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            $(btnCargar).prop('disabled', false).text('✅ Confirmar y Cargar');
+            if (!response.ok) {
+                $(resultDiv).html(`<div class="alert alert-danger">❌ ${response.error}</div>`);
+                return;
+            }
+            const r = response.resultado;
+            let html = '';
+
+            if (modo === 'marcas_modelos') {
+                // ── Líneas extra de pendientes resueltos ─────────────────
+                const liReglas = r.reglas_pendientes_aplicadas > 0 ? `
+                    <li class="text-success fw-semibold">
+                        ⚡ Reglas pendientes aplicadas automáticamente:
+                        <strong>${r.reglas_pendientes_aplicadas}</strong>
+                    </li>` : '';
+
+                const liExc = r.exc_pendientes_aplicadas > 0 ? `
+                    <li class="text-success fw-semibold">
+                        ⚡ Excepciones pendientes aplicadas automáticamente:
+                        <strong>${r.exc_pendientes_aplicadas}</strong>
+                    </li>` : '';
+
+                const liErrores = r.total_errores > 0 ? `
+                    <li class="text-danger">Errores: <strong>${r.total_errores}</strong></li>` : '';
+
+                const detalleErrores = r.errores.length ? `
+                    <div class="mt-2">
+                        <small class="fw-semibold text-danger">Primeros errores:</small><br>
+                        <small class="text-muted">${r.errores.join('<br>')}</small>
+                    </div>` : '';
+
+                html = `
+                    <div class="alert alert-success">
+                        <h6 class="alert-heading">✅ Carga completada</h6>
+                        <hr>
+                        <ul class="mb-0">
+                            <li>Marcas insertadas: <strong>${r.marcas_insertadas}</strong></li>
+                            <li>Modelos insertados: <strong>${r.modelos_insertados}</strong></li>
+                            <li>Modelos actualizados: <strong>${r.modelos_actualizados}</strong></li>
+                            <li>Modelos ignorados (ya existían): <strong>${r.modelos_ignorados}</strong></li>
+                            ${liReglas}
+                            ${liExc}
+                            ${liErrores}
+                        </ul>
+                        ${detalleErrores}
+                    </div>
+                `;
+
+            } else {
+                const liErrores = r.total_errores > 0 ? `
+                    <li class="text-danger">Errores: <strong>${r.total_errores}</strong></li>` : '';
+
+                const detalleErrores = r.errores.length ? `
+                    <div class="mt-2">
+                        <small class="fw-semibold text-danger">Primeros errores:</small><br>
+                        <small class="text-muted">${r.errores.join('<br>')}</small>
+                    </div>` : '';
+
+                html = `
+                    <div class="alert alert-success">
+                        <h6 class="alert-heading">✅ Carga completada</h6>
+                        <hr>
+                        <ul class="mb-0">
+                            <li>Registros insertados: <strong>${r.insertados}</strong></li>
+                            <li>Registros actualizados: <strong>${r.actualizados}</strong></li>
+                            <li>Registros ignorados (ya existían): <strong>${r.ignorados}</strong></li>
+                            <li>Modelos no encontrados en BD: <strong>${r.sin_modelo}</strong></li>
+                            ${liErrores}
+                        </ul>
+                        ${detalleErrores}
+                    </div>
+                `;
+            }
+
+            $(resultDiv).html(html);
+        },
+        error: function() {
+            $(btnCargar).prop('disabled', false).text('✅ Confirmar y Cargar');
+            $(resultDiv).html('<div class="alert alert-danger">❌ Error al conectar con el servidor.</div>');
+        }
+    });
+}
+</script>
+{% endblock %}

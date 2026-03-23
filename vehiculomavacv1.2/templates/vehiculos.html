@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Vehículos - Modelos{% endblock %}
 
 {% block content %}
@@ -8,28 +7,28 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
             {% endfor %}
         {% endif %}
     {% endwith %}
 
     <div class="bg-white shadow rounded p-4">
-
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="text-primary mb-0">Modelos de Vehículos</h2>
-            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAgregarModelo">
+            <button type="button" class="btn btn-success"
+                    data-bs-toggle="modal" data-bs-target="#modalAgregarModelo">
                 Agregar Nuevo Vehículo
             </button>
         </div>
 
         <!-- FILTROS -->
-        <form method="GET" class="row g-3 mb-4" id="formFiltro">
+        <form method="GET" class="row g-3 mb-4">
             <div class="col-md-4">
                 <label class="form-label">Marca</label>
-                <select class="form-select" name="marca_id" id="filtro_marca">
+                <select class="form-select" name="marca_id">
                     <option value="">Todas las marcas</option>
                     {% for m in marcas %}
                     <option value="{{ m[0] }}" {{ 'selected' if m[0] == marca_id else '' }}>{{ m[1] }}</option>
@@ -38,9 +37,8 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label">Modelo</label>
-                <input type="text" class="form-control" name="modelo" 
-                       value="{{ modelo_search }}" 
-                       placeholder="Ej: 120i, Corolla, Hilux...">
+                <input type="text" class="form-control" name="modelo"
+                       value="{{ modelo_search }}" placeholder="Ej: 120i, Corolla, Hilux...">
             </div>
             <div class="col-md-4 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-primary flex-fill">Filtrar</button>
@@ -53,33 +51,33 @@
             <table class="table table-striped table-hover table-bordered align-middle">
                 <thead class="table-light text-center">
                     <tr>
-                        <th>Marca</th>
-                        <th>Modelo</th>
-                        <th>Comentario</th>
+                        <th>Marca</th><th>Modelo</th><th>Comentario</th>
                         <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="text-center">
                     {% if modelos %}
                         {% for mod in modelos %}
+                        {# mod: (id_modelo[0], nombre_marca[1], nombre_modelo[2], comentario[3], id_marca[4]) #}
                         <tr>
                             <td class="fw-semibold">{{ mod[1] }}</td>
                             <td>{{ mod[2] }}</td>
                             <td>{{ mod[3] or '-' }}</td>
                             <td class="text-center">
-                                <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditarModelo{{ mod[0] }}">Editar</button>
-                                <form action="{{ url_for('eliminar_modelo', id=mod[0]) }}" method="POST" class="delete-form d-inline">
+                                <button class="btn btn-warning btn-sm"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalEditarModelo{{ mod[0] }}">Editar</button>
+                                <form action="{{ url_for('vehiculos.eliminar_modelo', id=mod[0]) }}"
+                                      method="POST" class="delete-form d-inline">
                                     <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
                                 </form>
                             </td>
                         </tr>
                         {% endfor %}
                     {% else %}
-                        <tr>
-                            <td colspan="4" class="text-center text-muted py-4">
-                                No se encontraron modelos con los filtros aplicados
-                            </td>
-                        </tr>
+                        <tr><td colspan="4" class="text-center text-muted py-4">
+                            No se encontraron modelos con los filtros aplicados
+                        </td></tr>
                     {% endif %}
                 </tbody>
             </table>
@@ -87,153 +85,337 @@
 
         <!-- PAGINACIÓN -->
         {% if pages > 1 %}
-        <nav aria-label="Paginación de modelos" class="mt-4">
+        <nav class="mt-4">
             <ul class="pagination justify-content-center">
                 {% if page > 1 %}
-                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos', page=1, marca_id=marca_id, modelo=modelo_search) }}">« Primera</a></li>
-                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos', page=page-1, marca_id=marca_id, modelo=modelo_search) }}">‹ Anterior</a></li>
+                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos.vehiculos', page=1, marca_id=marca_id, modelo=modelo_search) }}">« Primera</a></li>
+                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos.vehiculos', page=page-1, marca_id=marca_id, modelo=modelo_search) }}">‹ Anterior</a></li>
                 {% endif %}
-
-                {% set rango_inicio = [1, page - 3] | max %}
-                {% set rango_fin = [pages, page + 3] | min %}
-
-                {% if rango_inicio > 1 %}
-                <li class="page-item disabled"><span class="page-link">...</span></li>
-                {% endif %}
-
-                {% for p in range(rango_inicio, rango_fin + 1) %}
-                <li class="page-item {{ 'active' if p == page else '' }}">
-                    <a class="page-link" href="{{ url_for('vehiculos', page=p, marca_id=marca_id, modelo=modelo_search) }}">{{ p }}</a>
+                {% set rango_inicio = [1, page-3]|max %}
+                {% set rango_fin = [pages, page+3]|min %}
+                {% if rango_inicio > 1 %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
+                {% for p in range(rango_inicio, rango_fin+1) %}
+                <li class="page-item {{ 'active' if p==page else '' }}">
+                    <a class="page-link" href="{{ url_for('vehiculos.vehiculos', page=p, marca_id=marca_id, modelo=modelo_search) }}">{{ p }}</a>
                 </li>
                 {% endfor %}
-
-                {% if rango_fin < pages %}
-                <li class="page-item disabled"><span class="page-link">...</span></li>
-                {% endif %}
-
+                {% if rango_fin < pages %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
                 {% if page < pages %}
-                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos', page=page+1, marca_id=marca_id, modelo=modelo_search) }}">Siguiente ›</a></li>
-                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos', page=pages, marca_id=marca_id, modelo=modelo_search) }}">Última »</a></li>
+                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos.vehiculos', page=page+1, marca_id=marca_id, modelo=modelo_search) }}">Siguiente ›</a></li>
+                <li class="page-item"><a class="page-link" href="{{ url_for('vehiculos.vehiculos', page=pages, marca_id=marca_id, modelo=modelo_search) }}">Última »</a></li>
                 {% endif %}
             </ul>
         </nav>
         {% endif %}
-
-        <p class="text-center text-muted mt-3">
-            Mostrando {{ modelos|length }} de {{ total }} modelos
-        </p>
-
+        <p class="text-center text-muted mt-3">Mostrando {{ modelos|length }} de {{ total }} modelos</p>
     </div>
 
-    <!-- Modal Agregar Modelo -->
+
+    <!-- ===== MODAL AGREGAR MODELO ===== -->
     <div class="modal fade" id="modalAgregarModelo" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-primary">Agregar Nuevo Vehículo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ url_for('agregar_modelo') }}" method="POST">
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="chkNuevaMarca">
-                            <label class="form-check-label">Crear marca nueva (ej: Ferrari)</label>
-                        </div>
-
-                        <div id="divNuevaMarca" style="display:none;">
-                            <div class="mb-3">
-                                <label class="form-label">Nombre de la Nueva Marca</label>
-                                <input type="text" class="form-control" name="nueva_marca" placeholder="Ferrari">
-                            </div>
-                        </div>
-
-                        <div id="divMarcaExistente">
-                            <label class="form-label">Marca existente</label>
-                            <select class="form-select" name="id_marca">
-                                {% for m in marcas %}
-                                <option value="{{ m[0] }}">{{ m[1] }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Modelo</label>
-                            <input type="text" class="form-control" name="nombre_modelo" required placeholder="Ej: 488 Spider">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Comentario (opcional)</label>
-                            <textarea class="form-control" name="comentario" rows="2"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Guardar Vehículo</button>
-                    </form>
-                </div>
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Agregar Nuevo Vehículo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <form id="formAgregarModelo">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="chkNuevaMarca">
+                        <label class="form-check-label">Crear marca nueva</label>
+                    </div>
+                    <div id="divNuevaMarca" style="display:none;" class="mb-3">
+                        <label class="form-label">Nombre de la Nueva Marca</label>
+                        <input type="text" class="form-control" name="nueva_marca" placeholder="Ferrari">
+                    </div>
+                    <div id="divMarcaExistente" class="mb-3">
+                        <label class="form-label">Marca existente</label>
+                        <select class="form-select" name="id_marca">
+                            {% for m in marcas %}
+                            <option value="{{ m[0] }}">{{ m[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Modelo</label>
+                        <input type="text" class="form-control" name="nombre_modelo"
+                               required placeholder="Ej: 488 Spider">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comentario (opcional)</label>
+                        <textarea class="form-control" name="comentario" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar Vehículo</button>
+                </form>
+            </div>
+        </div></div>
     </div>
 
-    <!-- Modales Editar Modelo -->
+
+    <!-- ===== MODAL REGLAS PENDIENTES (marca nueva) ===== -->
+    <div class="modal fade" id="modalReglasPendientes" tabindex="-1"
+         aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">⚠️ Reglas Pendientes para esta Marca</h5>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">
+                    Se encontraron reglas de clasificación pendientes para esta marca.
+                    Confirma si deseas aplicar cada una:
+                </p>
+                <div id="listaReglasPendientes"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary"
+                        onclick="terminarPendientes('reglas')">Cerrar y continuar</button>
+            </div>
+        </div></div>
+    </div>
+
+
+    <!-- ===== MODAL EXCEPCIONES PENDIENTES (modelo nuevo) ===== -->
+    <div class="modal fade" id="modalExcepcionesPendientes" tabindex="-1"
+         aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">⚠️ Excepciones Pendientes para este Modelo</h5>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">
+                    Se encontraron excepciones de clasificación pendientes para este modelo.
+                    Confirma si deseas aplicar cada una:
+                </p>
+                <div id="listaExcepcionesPendientes"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary"
+                        onclick="terminarPendientes('excepciones')">Cerrar y continuar</button>
+            </div>
+        </div></div>
+    </div>
+
+
+    <!-- ===== MODALES EDITAR MODELO ===== -->
     {% for mod in modelos %}
     <div class="modal fade" id="modalEditarModelo{{ mod[0] }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-primary">Editar Modelo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ url_for('editar_modelo', id=mod[0]) }}" method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Marca</label>
-                            <select class="form-select" name="id_marca" required>
-                                {% for m in marcas %}
-                                <option value="{{ m[0] }}" {{ 'selected' if m[0] == mod[1] else '' }}>{{ m[1] }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Modelo</label>
-                            <input type="text" class="form-control" name="nombre_modelo" value="{{ mod[2] }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Comentario</label>
-                            <textarea class="form-control" name="comentario" rows="2">{{ mod[3] or '' }}</textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Actualizar</button>
-                    </form>
-                </div>
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Editar Modelo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <form action="{{ url_for('vehiculos.editar_modelo', id=mod[0]) }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Marca</label>
+                        <select class="form-select" name="id_marca" required>
+                            {% for m in marcas %}
+                            <option value="{{ m[0] }}" {{ 'selected' if m[0]==mod[4] else '' }}>{{ m[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Modelo</label>
+                        <input type="text" class="form-control" name="nombre_modelo"
+                               value="{{ mod[2] }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comentario</label>
+                        <textarea class="form-control" name="comentario" rows="2">{{ mod[3] or '' }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                </form>
+            </div>
+        </div></div>
     </div>
     {% endfor %}
 
 </div>
 {% endblock %}
 
+
 {% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-// Limpiar filtros
 function limpiarFiltros() {
-    window.location.href = "{{ url_for('vehiculos') }}";
+    window.location.href = "{{ url_for('vehiculos.vehiculos') }}";
 }
 
-// SweetAlert para eliminar
+$('#chkNuevaMarca').change(function() {
+    $('#divNuevaMarca').toggle(this.checked);
+    $('#divMarcaExistente').toggle(!this.checked);
+});
+
+// SweetAlert eliminar modelo
 $('.delete-form').on('submit', function(e) {
     e.preventDefault();
-    var form = this;
+    const form = this;
     Swal.fire({
-        title: '¿Eliminar modelo?',
-        text: "No se puede deshacer",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Sí, eliminar'
-    }).then((result) => {
-        if (result.isConfirmed) form.submit();
+        title: '¿Eliminar modelo?', text: 'No se puede deshacer',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#d33', confirmButtonText: 'Sí, eliminar'
+    }).then(r => { if (r.isConfirmed) form.submit(); });
+});
+
+// ── Agregar modelo via AJAX ───────────────────────────────────────────────────
+$('#formAgregarModelo').on('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    $.ajax({
+        url: "{{ url_for('vehiculos.agregar_modelo') }}",
+        method: 'POST', data: formData,
+        processData: false, contentType: false,
+        success: function(response) {
+            if (!response || !response.success) {
+                window.location.reload();
+                return;
+            }
+            $('#modalAgregarModelo').modal('hide');
+
+            if (response.tipo === 'reglas_pendientes') {
+                mostrarReglasPendientes(response.reglas_pend, response.id_marca, response.id_modelo);
+            } else if (response.tipo === 'excepciones_pendientes') {
+                mostrarExcepcionesPendientes(response.pendientes, response.id_modelo);
+            } else {
+                window.location.reload();
+            }
+        },
+        error: function() { window.location.reload(); }
     });
 });
+
+// ── REGLAS PENDIENTES ─────────────────────────────────────────────────────────
+let reglasPendRestantes = [];
+let idModeloGlobal      = null;
+
+function mostrarReglasPendientes(reglas, idMarca, idModelo) {
+    reglasPendRestantes = reglas;
+    idModeloGlobal      = idModelo;
+    renderReglasPendientes(idMarca);
+    $('#modalReglasPendientes').modal('show');
+}
+
+function renderReglasPendientes(idMarca) {
+    const lista = $('#listaReglasPendientes');
+    lista.empty();
+    if (!reglasPendRestantes.length) {
+        lista.html('<div class="alert alert-success">✅ Todas las reglas procesadas.</div>');
+        // Ahora verificar si hay excepciones pendientes para el modelo
+        if (idModeloGlobal) _verificarExcepcionesTrasReglas(idMarca, idModeloGlobal);
+        return;
+    }
+    reglasPendRestantes.forEach((r, idx) => {
+        const modelo = r.nombre_modelo || 'Toda la marca';
+        const años   = r.anio_inicio ? `${r.anio_inicio}${r.anio_fin ? ' - ' + r.anio_fin : '+'}` : 'Todos los años';
+        lista.append(`
+            <div class="card mb-3 border-warning">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <strong>${r.empresa}</strong> — ${r.tipo_riesgo}
+                    </h6>
+                    <p class="mb-1">Marca: <strong>${r.nombre_marca}</strong> | Modelo: <strong>${modelo}</strong></p>
+                    <p class="mb-1 text-muted small">Años: ${años}${r.nota_regla ? ' | Nota: ' + r.nota_regla : ''}</p>
+                    <div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-success btn-sm"
+                                onclick="resolverReglaPendiente(${idx}, ${r.id_pendiente}, ${r.id_marca}, true)">
+                            ✅ Aplicar regla
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm"
+                                onclick="resolverReglaPendiente(${idx}, ${r.id_pendiente}, ${r.id_marca}, false)">
+                            ✗ Ignorar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+    });
+}
+
+function resolverReglaPendiente(idx, idPendiente, idMarca, confirmar) {
+    $.ajax({
+        url: "{{ url_for('vehiculos.resolver_regla_pendiente') }}",
+        method: 'POST', contentType: 'application/json',
+        data: JSON.stringify({ id_pendiente: idPendiente, id_marca: idMarca, confirmar: confirmar }),
+        success: function(response) {
+            if (response.success) {
+                reglasPendRestantes.splice(idx, 1);
+                renderReglasPendientes(idMarca);
+            } else { alert('Error: ' + response.error); }
+        }
+    });
+}
+
+function _verificarExcepcionesTrasReglas(idMarca, idModelo) {
+    // Recargar la página tras procesar reglas — el modelo ya fue creado
+    // Las excepciones pendientes se verifican en el servidor al agregar el modelo
+    // Como el modelo ya se creó antes, recargamos para mostrar resultado
+    window.location.reload();
+}
+
+// ── EXCEPCIONES PENDIENTES ────────────────────────────────────────────────────
+let excPendRestantes = [];
+
+function mostrarExcepcionesPendientes(pendientes, idModelo) {
+    excPendRestantes = pendientes;
+    idModeloGlobal   = idModelo;
+    renderExcepcionesPendientes();
+    $('#modalExcepcionesPendientes').modal('show');
+}
+
+function renderExcepcionesPendientes() {
+    const lista = $('#listaExcepcionesPendientes');
+    lista.empty();
+    if (!excPendRestantes.length) {
+        lista.html('<div class="alert alert-success">✅ Todas las excepciones procesadas.</div>');
+        return;
+    }
+    excPendRestantes.forEach((p, idx) => {
+        lista.append(`
+            <div class="card mb-3 border-warning">
+                <div class="card-body">
+                    <h6 class="card-title">Regla en <strong>${p.empresa}</strong></h6>
+                    <p class="mb-1">
+                        Patrón: <code>${p.nombre_patron}</code>
+                        <span class="badge bg-secondary ms-1">${p.tipo}</span>
+                        → <span class="badge bg-info text-dark">${p.riesgo_alt}</span>
+                    </p>
+                    ${p.nota_regla ? `<p class="mb-2 text-muted small">Nota: ${p.nota_regla}</p>` : ''}
+                    <div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-success btn-sm"
+                                onclick="resolverExcPendiente(${idx}, ${p.id_pendiente}, ${idModeloGlobal}, true)">
+                            ✅ Aplicar excepción
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm"
+                                onclick="resolverExcPendiente(${idx}, ${p.id_pendiente}, ${idModeloGlobal}, false)">
+                            ✗ Ignorar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+    });
+}
+
+function resolverExcPendiente(idx, idPendiente, idModelo, confirmar) {
+    $.ajax({
+        url: "{{ url_for('vehiculos.resolver_pendiente') }}",
+        method: 'POST', contentType: 'application/json',
+        data: JSON.stringify({ id_pendiente: idPendiente, id_modelo: idModelo, confirmar: confirmar }),
+        success: function(response) {
+            if (response.success) {
+                excPendRestantes.splice(idx, 1);
+                renderExcepcionesPendientes();
+            } else { alert('Error: ' + response.error); }
+        }
+    });
+}
+
+function terminarPendientes(tipo) {
+    if (tipo === 'reglas') $('#modalReglasPendientes').modal('hide');
+    else $('#modalExcepcionesPendientes').modal('hide');
+    window.location.reload();
+}
 </script>
 {% endblock %}
