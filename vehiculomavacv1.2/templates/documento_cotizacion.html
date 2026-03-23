@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+{% block title %}Cotización {{ numero }} — MAVAC{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ══ PANTALLA ══════════════════════════════════════════════════════════════ */
+.doc-toolbar {
+    background:#fff; border-bottom:1px solid #ddd;
+    padding:10px 24px; display:flex; align-items:center; gap:10px;
+    position:sticky; top:0; z-index:100;
+}
+.doc-wrap {
+    max-width:980px; margin:24px auto; background:#fff;
+    box-shadow:0 2px 20px rgba(0,0,0,.12);
+    padding:32px 36px; font-family:Arial,sans-serif; font-size:11px;
+}
+
+/* ── Header ── */
+.doc-header {
+    display:flex; justify-content:space-between; align-items:flex-start;
+    margin-bottom:18px; padding-bottom:12px; border-bottom:3px solid #00489a;
+}
+.doc-header-left .vehiculo { font-size:14px; font-weight:700; color:#00489a; }
+.doc-header-left .cliente  { font-size:11px; color:#333; line-height:1.6; }
+.doc-header-right { text-align:right; }
+.doc-header-right .num-cot { font-size:13px; font-weight:700; color:#00489a; }
+.doc-header-right .fecha   { font-size:11px; color:#666; }
+
+/* ── Tabla ── */
+.tabla-cot { width:100%; border-collapse:collapse; }
+.tabla-cot th {
+    padding:8px 7px; font-size:10px; text-transform:uppercase;
+    letter-spacing:.03em; vertical-align:middle; text-align:center;
+}
+.tabla-cot td {
+    padding:6px 7px; font-size:10.5px; vertical-align:top;
+    border-bottom:1px solid #eee; text-align:center;
+}
+.tabla-cot tr:last-child td { border-bottom:none; }
+.tabla-cot .col-concepto {
+    text-align:left; font-weight:600; color:#333;
+    background:#f5f7fb; white-space:nowrap; width:200px;
+}
+
+/* ── Cabeceras empresa ── */
+.th-empresa { padding:6px 10px; }
+.th-empresa img { max-width:90px; object-fit:contain }
+
+.tr-prima td { font-weight:700; font-size:12px; background:#eaf2ff; }
+.tr-valor td { font-weight:600; background:#f0f4ff; }
+
+/* Sección principal (Coberturas, Accidentes, etc.) */
+.tr-section th {
+    background:#1e3a5f; color:#fff; font-size:10px;
+    padding:5px 7px; text-align:left;
+}
+/* Subsección dentro de Deducibles (Talleres) */
+.tr-subsection th {
+    background:#344e6e; color:#e0eaff; font-size:9.5px;
+    padding:4px 7px; text-align:left; font-style:italic;
+}
+
+.no-cotiza { color:#aaa; font-style:italic; }
+.editado-badge {
+    display:inline-block; background:#fff3cd; color:#856404;
+    font-size:9px; padding:1px 5px; border-radius:3px; margin-left:4px;
+}
+
+/* ── Footer ── */
+.doc-footer {
+    margin-top:20px; padding-top:10px; border-top:1px solid #ddd;
+    font-size:9.5px; color:#888; text-align:center;
+}
+
+/* ── Campos editables ── */
+.editable {
+    border:none; background:transparent; font-size:inherit;
+    font-family:inherit; font-weight:inherit; color:inherit;
+    width:100%; padding:0; outline:none; text-align:inherit;
+}
+body.modo-edicion .editable {
+    border-bottom:1px dashed #00489a; background:#fffde7; cursor:text;
+}
+
+/* ══ IMPRESIÓN ═════════════════════════════════════════════════════════════ */
+@media print {
+    .doc-toolbar, .barra-lateral { display:none !important; }
+    main { margin-left:0 !important; padding:0 !important; }
+    .doc-wrap { box-shadow:none; margin:0; padding:20px; max-width:100%; }
+    body.modo-edicion .editable { border-bottom:none; background:transparent; }
+    .editado-badge { display:none; }
+    @page { size:A4 landscape; margin:8mm; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══ TOOLBAR ════════════════════════════════════════════════════════════ -->
+<div class="doc-toolbar">
+    <button class="btn btn-sm btn-outline-secondary" onclick="history.back()">← Volver</button>
+    <button id="btn_editar"   class="btn btn-sm btn-warning"          onclick="activarEdicion()">✏️ Editar</button>
+    <button id="btn_guardar"  class="btn btn-sm btn-success d-none"   onclick="guardarEdicion()">💾 Guardar cambios</button>
+    <button id="btn_cancelar" class="btn btn-sm btn-outline-secondary d-none" onclick="cancelarEdicion()">✕ Cancelar</button>
+    <div class="ms-auto d-flex gap-2 align-items-center">
+        {% if editado %}<span class="badge bg-warning text-dark">⚠️ Editado manualmente</span>{% endif %}
+        <button class="btn btn-sm btn-primary" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+</div>
+
+<!-- ══ DOCUMENTO ═════════════════════════════════════════════════════════ -->
+<div class="doc-wrap" id="documento">
+
+    <!-- Header -->
+    <div class="doc-header">
+        <div class="doc-header-left">
+            <div class="vehiculo">
+                <span class="editable" id="campo_vehiculo" contenteditable="false">
+                    {{ nombre_marca }} | {{ nombre_modelo }} | {{ anio_fabricacion }}
+                </span>
+            </div>
+            <div class="cliente">
+                <span class="editable" id="campo_cliente" contenteditable="false">{{ nombre_cliente }}</span>
+                {% if dni_ruc %} | DNI/RUC <span class="editable" id="campo_dni" contenteditable="false">{{ dni_ruc }}</span>{% endif %}
+            </div>
+            {% if email %}<div class="cliente"><span class="editable" id="campo_email" contenteditable="false">{{ email }}</span></div>{% endif %}
+            {% if placa %}<div class="cliente">Placa: <span class="editable" id="campo_placa" contenteditable="false">{{ placa }}</span></div>{% endif %}
+        </div>
+        <div class="doc-header-right">
+            <img src="{{ url_for('static', filename='img/mavaclogoparte3.png') }}" height="40px" style="margin-bottom:4px;"><br>
+            <div class="num-cot">{{ numero }}</div>
+            <div class="fecha">{{ fecha }}</div>
+        </div>
+    </div>
+
+    <!-- Tabla comparativa -->
+    <table class="tabla-cot">
+        <thead>
+            <tr>
+                <th></th>
+                {% for d in detalles %}
+                {# ── LOGOS DE EMPRESA en lugar de texto ── #}
+                <th class="th-empresa">
+                    {% set nombre_lower = d.empresa | lower | replace(' ', '') %}
+                    {% if 'rimac' in nombre_lower %}
+                        <img src="{{ url_for('static', filename='img/logorimac.png') }}" alt="RIMAC">
+                    {% elif 'mapfre' in nombre_lower %}
+                        <img src="{{ url_for('static', filename='img/logomapfre.png') }}" alt="MAPFRE">
+                    {% elif 'positiva' in nombre_lower %}
+                        <img src="{{ url_for('static', filename='img/logopositiva.png') }}" alt="La Positiva">
+                    {% elif 'pacifico' in nombre_lower or 'pacífico' in nombre_lower %}
+                        <img src="{{ url_for('static', filename='img/logopacifico.png') }}" alt="Pacífico">
+                    {% else %}
+                        {{ d.empresa }}
+                    {% endif %}
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+
+            <!-- ── PRIMA Y VALOR ── -->
+            <tr class="tr-prima">
+                <td class="col-concepto">PRIMA MENSUAL (referencial)</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.prima %}
+                        <span class="editable prima-mensual-campo" data-empresa-id="{{ d.id_empresa }}" contenteditable="false">
+                            US$ {{ "%.2f"|format(d.prima / 12) }}
+                        </span>
+                        {% if d.prima_editada %}<span class="editado-badge">editado</span>{% endif %}
+                    {% else %}<span class="no-cotiza">CONSULTAR</span>{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            <tr class="tr-prima">
+                <td class="col-concepto">PRIMA ANUAL</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.prima %}
+                        <span class="editable prima-anual-campo" data-empresa-id="{{ d.id_empresa }}" contenteditable="false">
+                            US$ {{ "%.2f"|format(d.prima) }}
+                        </span>
+                        {% if d.prima_editada %}<span class="editado-badge">editado</span>{% endif %}
+                    {% else %}<span class="no-cotiza">CONSULTAR</span>{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            <tr class="tr-valor">
+                <td class="col-concepto">VALOR ASEGURADO</td>
+                {% for d in detalles %}
+                <td>
+                    <span class="editable" id="campo_suma_{{ loop.index }}" contenteditable="false">
+                        US$ {{ "%.2f"|format(suma_asegurada) }}
+                    </span>
+                </td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">TIPO DE RIESGO</td>
+                {% for d in detalles %}<td>{{ d.tipo_riesgo }}</td>{% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">REQUIERE GPS</td>
+                {% for d in detalles %}<td>{{ d.coberturas.get('gps', '-') }}</td>{% endfor %}
+            </tr>
+
+            <!-- ── COBERTURAS ── -->
+            <tr class="tr-section"><th colspan="{{ detalles|length + 1 }}">COBERTURAS</th></tr>
+            {% for concepto in ['Daño propio', 'Huelgas, conmoción civil, daño malicioso, vandalismo y terrorismo', 'Riesgos de la naturaleza', 'Vías no autorizadas', 'Robo parcial'] %}
+            <tr>
+                <td class="col-concepto">{{ concepto }}</td>
+                {% for d in detalles %}
+                <td>{% if d.asegurable %}US$ {{ "%.2f"|format(suma_asegurada) }}{% else %}<span class="no-cotiza">No Cotiza</span>{% endif %}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+            <tr>
+                <td class="col-concepto">Resultado alcoholemia</td>
+                {% for d in detalles %}<td>{{ d.coberturas.get('alcoholemia', '-') }}</td>{% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">Responsabilidad civil frente a terceros</td>
+                {% for d in detalles %}
+                <td>{% if d.asegurable %}{{ d.coberturas.get('rc_terceros', '-') }}{% else %}<span class="no-cotiza">No Cotiza</span>{% endif %}</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">Responsabilidad civil de ocupantes</td>
+                {% for d in detalles %}
+                <td>{% if d.asegurable %}{{ d.coberturas.get('rc_ocupantes', '-') }}{% else %}<span class="no-cotiza">No Cotiza</span>{% endif %}</td>
+                {% endfor %}
+            </tr>
+
+            <!-- ── ACCIDENTES PERSONALES ── -->
+            <tr class="tr-section"><th colspan="{{ detalles|length + 1 }}">ACCIDENTES PERSONALES DE OCUPANTES</th></tr>
+            {% for campo, label in [('acc_muerte','*Muerte'), ('acc_invalidez','*Invalidez permanente c/u'), ('acc_curacion','*Gastos de curación c/u'), ('acc_sepelio','*Gastos de sepelio c/u'), ('acc_estetica','*Gastos por cirugía estética c/u')] %}
+            <tr>
+                <td class="col-concepto">{{ label }}</td>
+                {% for d in detalles %}
+                <td>{% if d.asegurable %}{{ d.coberturas.get(campo, '-') }}{% else %}<span class="no-cotiza">No Aplica</span>{% endif %}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+
+            <!-- ── SERVICIOS ── -->
+            <tr class="tr-section"><th colspan="{{ detalles|length + 1 }}">SERVICIOS</th></tr>
+            {% for campo, label in [('defensa_juridica','Defensa jurídica penal del conductor'), ('auxilio_mecanico','Auxilio mecánico'), ('veh_reemplazo','Vehículo de reemplazo'), ('chofer_reemplazo','Chofer de reemplazo')] %}
+            <tr>
+                <td class="col-concepto">{{ label }}</td>
+                {% for d in detalles %}<td>{{ d.coberturas.get(campo, '-') }}</td>{% endfor %}
+            </tr>
+            {% endfor %}
+
+            <!-- ══ DEDUCIBLES (sección principal) ════════════════════════ -->
+            <tr class="tr-section"><th colspan="{{ detalles|length + 1 }}">DEDUCIBLES</th></tr>
+
+            <!-- Deducibles fijos por tipo de riesgo -->
+            <tr>
+                <td class="col-concepto">Accesorios musicales</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.deducibles and d.deducibles.musicales %}{{ d.deducibles.musicales }}
+                    {% elif not d.asegurable %}<span class="no-cotiza">No Aplica</span>
+                    {% else %}-{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">Vehículo de reemplazo</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.deducibles and d.deducibles.veh_reemplazo %}{{ d.deducibles.veh_reemplazo }}
+                    {% elif not d.asegurable %}<span class="no-cotiza">No Aplica</span>
+                    {% else %}-{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">Conductores menores</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.deducibles and d.deducibles.conductores %}{{ d.deducibles.conductores }}
+                    {% elif not d.asegurable %}<span class="no-cotiza">No Aplica</span>
+                    {% else %}-{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">Lunas nacionales</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.deducibles and d.deducibles.lunas %}{{ d.deducibles.lunas }}
+                    {% elif not d.asegurable %}<span class="no-cotiza">No Aplica</span>
+                    {% else %}-{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+
+            <!-- ── Talleres (subsección dentro de Deducibles) ── -->
+            <tr class="tr-subsection"><th colspan="{{ detalles|length + 1 }}">— Talleres</th></tr>
+            <tr>
+                <td class="col-concepto">Deducible por evento</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.deducibles and d.deducibles.evento %}{{ d.deducibles.evento }}
+                    {% elif not d.asegurable %}<span class="no-cotiza">No Aplica</span>
+                    {% else %}-{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">Red de talleres afiliados</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.deducibles and d.deducibles.taller %}{{ d.deducibles.taller }}
+                    {% elif not d.asegurable %}<span class="no-cotiza">No Aplica</span>
+                    {% else %}-{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="col-concepto">Robo parcial (talleres)</td>
+                {% for d in detalles %}
+                <td>
+                    {% if d.deducibles and d.deducibles.robo %}{{ d.deducibles.robo }}
+                    {% elif not d.asegurable %}<span class="no-cotiza">No Aplica</span>
+                    {% else %}-{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+
+        </tbody>
+    </table>
+
+    <!-- Observaciones -->
+    <div style="margin-top:14px; font-size:10px; color:#555;">
+        <strong>Observaciones:</strong>
+        <span class="editable" id="campo_observaciones" contenteditable="false"
+              style="display:block; min-height:18px;">{{ observaciones }}</span>
+    </div>
+
+    <!-- Footer -->
+    <div class="doc-footer">
+        MAVAC CORREDORES DE SEGUROS S.A.C. &copy; {{ fecha[:4] if fecha else '2026' }}
+        {% if editado %} — <em>Documento editado manualmente</em>{% endif %}
+    </div>
+
+</div><!-- /doc-wrap -->
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+const ID_COTIZACION = {{ id_cotizacion }};
+let datosOriginales = {};
+
+function activarEdicion() {
+    document.body.classList.add('modo-edicion');
+    document.querySelectorAll('.editable').forEach(el => {
+        el.setAttribute('contenteditable', 'true');
+        datosOriginales[el.id || el.dataset.empresaId + '_' + el.className] = el.innerText.trim();
+    });
+    $('#btn_editar').addClass('d-none');
+    $('#btn_guardar, #btn_cancelar').removeClass('d-none');
+}
+
+function cancelarEdicion() {
+    document.body.classList.remove('modo-edicion');
+    document.querySelectorAll('.editable').forEach(el => {
+        el.setAttribute('contenteditable', 'false');
+        const key = el.id || el.dataset.empresaId + '_' + el.className;
+        if (datosOriginales[key] !== undefined) el.innerText = datosOriginales[key];
+    });
+    $('#btn_editar').removeClass('d-none');
+    $('#btn_guardar, #btn_cancelar').addClass('d-none');
+}
+
+function guardarEdicion() {
+    const primas = [];
+    document.querySelectorAll('.prima-anual-campo').forEach(el => {
+        const idEmpresa = el.dataset.empresaId;
+        const val = parseFloat(el.innerText.replace('US$', '').replace(/,/g, '').trim());
+        if (!isNaN(val)) primas.push({ id_empresa: parseInt(idEmpresa), prima: val });
+    });
+
+    const sumaEl  = document.querySelector('[id^="campo_suma_"]');
+    const sumaVal = sumaEl
+        ? parseFloat(sumaEl.innerText.replace('US$', '').replace(/,/g, '').trim())
+        : null;
+
+    const payload = {
+        nombre_cliente: ($('#campo_cliente').text() || '').trim(),
+        dni_ruc:        ($('#campo_dni').text()     || '').trim(),
+        placa:          ($('#campo_placa').text()   || '').trim(),
+        email:          ($('#campo_email').text()   || '').trim(),
+        suma_asegurada: sumaVal,
+        observaciones:  ($('#campo_observaciones').text() || '').trim(),
+        primas,
+    };
+
+    $.ajax({
+        url: `/api/guardar_edicion/${ID_COTIZACION}`,
+        method: 'POST', contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function(r) {
+            if (r.ok) {
+                document.body.classList.remove('modo-edicion');
+                document.querySelectorAll('.editable').forEach(el => el.setAttribute('contenteditable','false'));
+                $('#btn_editar').removeClass('d-none');
+                $('#btn_guardar, #btn_cancelar').addClass('d-none');
+                $('.ms-auto').prepend('<span class="badge bg-warning text-dark me-2">⚠️ Editado manualmente</span>');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                alert('Error al guardar: ' + r.error);
+            }
+        },
+        error: () => alert('Error de conexión.')
+    });
+}
+</script>
+{% endblock %}
