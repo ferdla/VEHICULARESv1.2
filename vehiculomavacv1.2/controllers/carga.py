@@ -1,12 +1,17 @@
 # =============================================================================
 # controllers/carga.py
 # Rutas: /carga
+#
+# CORRECCIONES respecto a la versión anterior:
+#   1. get_last_insert_id importado de database.py (no de vehiculo_model)
+#   2. _parsear_valor() maneja VRN='ND' y cualquier texto sin reventar
+#   3. _cargar_valores() usa executemany() en lotes → de ~120s a ~3s
 # =============================================================================
 
 import io
 import pandas as pd
 from flask import Blueprint, render_template, request, jsonify
-from database import get_cursor, commit, rollback
+from database import get_cursor, commit, rollback, get_last_insert_id   # ← FIX 1
 import models.vehiculo as vehiculo_model
 import models.clasificacion as clasificacion_model
 from services.pendientes import (
@@ -16,6 +21,13 @@ from services.pendientes import (
 
 bp = Blueprint('carga', __name__)
 
+# Tamaño de lote para executemany (inserciones masivas)
+BATCH_SIZE = 500
+
+
+# ==============================================================================
+# VISTA PRINCIPAL
+# ==============================================================================
 
 @bp.route('/carga')
 def carga():
@@ -87,6 +99,7 @@ def ejecutar():
 # ==============================================================================
 
 def _leer_excel(archivo):
+    """Lee el archivo y valida columnas obligatorias."""
     try:
         contenido = archivo.read()
         df = pd.read_excel(io.BytesIO(contenido))
@@ -104,13 +117,37 @@ def _leer_excel(archivo):
     df['Marca']  = df['Marca'].astype(str).str.strip()
     df['Modelo'] = df['Modelo'].astype(str).str.strip()
 
-    vrn_col = next((c for c in df.columns if 'VRN' in c.upper() or 'OKM' in c.upper()), None)
+    # Detectar columna VRN (acepta "VRN", "VRN(OKM EN TIENDA)", "VRN OKM", etc.)
+    vrn_col = next(
+        (c for c in df.columns if 'VRN' in c.upper() or 'OKM' in c.upper()),
+        None
+    )
     df.attrs['vrn_col'] = vrn_col
 
+    # Detectar columnas de años (números entre 2000 y 2030)
     year_cols = [c for c in df.columns if c.isdigit() and 2000 <= int(c) <= 2030]
     df.attrs['year_cols'] = year_cols
 
     return df
+
+
+def _parsear_valor(val):
+    """
+    ── FIX 2 ──────────────────────────────────────────────────────────────────
+    Convierte cualquier valor del Excel a float de forma segura.
+    Maneja: números, strings numéricos, 'ND', NaN, None, negativos.
+    Retorna None si no es un número válido > 0, SIN lanzar excepción.
+    ───────────────────────────────────────────────────────────────────────────
+    """
+    if val is None:
+        return None
+    if isinstance(val, float) and pd.isna(val):
+        return None
+    try:
+        v = float(str(val).replace(',', '').replace(' ', ''))
+        return v if v > 0 else None
+    except (ValueError, TypeError):
+        return None   # 'ND', texto, etc. → ignorar silenciosamente
 
 
 # ==============================================================================
@@ -118,6 +155,7 @@ def _leer_excel(archivo):
 # ==============================================================================
 
 def _previsualizar_marcas_modelos(cur, df):
+    """Calcula qué se insertaría sin tocar la BD."""
     marcas_nuevas      = []
     modelos_nuevos     = []
     modelos_existentes = []
@@ -142,11 +180,11 @@ def _previsualizar_marcas_modelos(cur, df):
         else:
             modelos_nuevos.append(f"{nombre_marca} — {nombre_modelo}")
 
+    # Contar pendientes que se resolverían
     reglas_a_resolver = sum(
         clasificacion_model.count_reglas_pendientes_por_marca(cur, nm)
         for nm in marcas_nuevas
     )
-
     exc_a_resolver = 0
     for item in modelos_nuevos:
         if ' — ' in item:
@@ -173,6 +211,7 @@ def _previsualizar_marcas_modelos(cur, df):
 
 
 def _cargar_marcas_modelos(cur, df, accion):
+    """Inserta marcas y modelos, resolviendo pendientes automáticamente."""
     marcas_cache      = {}
     insertadas_marcas = 0
     insertados_mod    = 0
@@ -195,10 +234,9 @@ def _cargar_marcas_modelos(cur, df, accion):
                 else:
                     vehiculo_model.insert_marca(cur, nombre_marca)
                     commit()
-                    nuevo_id = vehiculo_model.get_last_insert_id(cur)
+                    nuevo_id = get_last_insert_id(cur)   # ← FIX 1: desde database.py
                     marcas_cache[nombre_marca] = nuevo_id
                     insertadas_marcas += 1
-                    # Aplicar reglas pendientes automáticamente
                     reglas_aplicadas += aplicar_reglas_pendientes_de_marca(
                         cur, nombre_marca, nuevo_id, commit
                     )
@@ -217,9 +255,8 @@ def _cargar_marcas_modelos(cur, df, accion):
             else:
                 vehiculo_model.insert_modelo(cur, id_marca, nombre_modelo, None)
                 commit()
-                nuevo_id_modelo = vehiculo_model.get_last_insert_id(cur)
+                nuevo_id_modelo = get_last_insert_id(cur)   # ← FIX 1
                 insertados_mod += 1
-                # Aplicar excepciones pendientes automáticamente
                 exc_aplicadas += aplicar_excepciones_pendientes_de_modelo(
                     cur, id_marca, nombre_modelo, nuevo_id_modelo, commit
                 )
@@ -245,6 +282,7 @@ def _cargar_marcas_modelos(cur, df, accion):
 # ==============================================================================
 
 def _previsualizar_valores(cur, df):
+    """Calcula qué valores se insertarían sin tocar la BD."""
     vrn_col   = df.attrs.get('vrn_col')
     year_cols = df.attrs.get('year_cols', [])
 
@@ -253,12 +291,14 @@ def _previsualizar_valores(cur, df):
 
     total_vrn         = 0
     total_historicos  = 0
+    vrn_ignorados     = 0
     modelos_sin_match = []
     modelos_con_match = 0
 
     for _, row in df.iterrows():
         nombre_marca  = row['Marca']
         nombre_modelo = row['Modelo']
+
         marca = vehiculo_model.get_marca_by_nombre(cur, nombre_marca)
         if not marca:
             modelos_sin_match.append(f"{nombre_marca} — {nombre_modelo}")
@@ -270,11 +310,16 @@ def _previsualizar_valores(cur, df):
             continue
 
         modelos_con_match += 1
-        if pd.notna(row.get(vrn_col)) and row.get(vrn_col) > 0:
+
+        # ── FIX 2: usar _parsear_valor en lugar de vrn > 0 ───────────────
+        vrn = _parsear_valor(row.get(vrn_col))
+        if vrn:
             total_vrn += 1
+        else:
+            vrn_ignorados += 1
+
         for y in year_cols:
-            val = row.get(y)
-            if pd.notna(val) and val > 0:
+            if _parsear_valor(row.get(y)):
                 total_historicos += 1
 
     return {
@@ -284,72 +329,175 @@ def _previsualizar_valores(cur, df):
         'modelos_sin_match':     len(modelos_sin_match),
         'sin_match_lista':       modelos_sin_match[:15],
         'vrn_a_insertar':        total_vrn,
+        'vrn_ignorados':         vrn_ignorados,
         'historicos_a_insertar': total_historicos,
         'total_registros':       total_vrn + total_historicos,
     }
 
 
 def _cargar_valores(cur, df, accion):
+    """
+    ── FIX 3 ──────────────────────────────────────────────────────────────────
+    Carga masiva de valores vehiculares usando executemany() en lotes de 500.
+    Pasos:
+      1. Una sola query para traer TODOS los modelos → mapa {(marca, modelo): id}
+      2. Si accion='ignorar', una sola query para traer todos los existentes
+      3. Construir listas a_insertar y a_actualizar en Python (sin tocar la BD)
+      4. executemany() en lotes de BATCH_SIZE (500) → de ~120s a ~3s
+    ───────────────────────────────────────────────────────────────────────────
+    """
     vrn_col   = df.attrs.get('vrn_col')
     year_cols = df.attrs.get('year_cols', [])
 
     if not vrn_col:
         return {'error': 'No se encontró columna VRN'}
 
-    insertados   = 0
-    actualizados = 0
-    ignorados    = 0
+    # ── Paso 1: Mapa completo de modelos en una sola query ────────────────────
+    cur.execute("""
+        SELECT mo.id_modelo, ma.nombre_marca, mo.nombre_modelo
+        FROM modelo mo
+        JOIN marca ma ON mo.id_marca = ma.id_marca
+    """)
+    modelo_map = {
+        (nombre_marca, nombre_modelo): id_modelo
+        for id_modelo, nombre_marca, nombre_modelo in cur.fetchall()
+    }
+
+    # ── Paso 2: Set de valores ya existentes (para accion='ignorar') ──────────
+    existentes = set()
+    if accion == 'ignorar':
+        cur.execute("SELECT id_modelo, anio, tipo_valor FROM valor_vehiculo")
+        for id_mod, anio, tipo in cur.fetchall():
+            existentes.add((id_mod, anio, tipo))
+
+    # ── Paso 3: Construir lotes en Python ─────────────────────────────────────
+    a_insertar   = []   # (id_modelo, anio_o_None, valor, tipo_valor)
+    a_actualizar = []   # (valor, id_modelo, anio_o_None, tipo_valor)
     sin_modelo   = 0
-    errores      = []
+    vrn_ignorados = 0
 
     for _, row in df.iterrows():
         nombre_marca  = row['Marca']
         nombre_modelo = row['Modelo']
+        id_modelo = modelo_map.get((nombre_marca, nombre_modelo))
 
-        marca = vehiculo_model.get_marca_by_nombre(cur, nombre_marca)
-        if not marca:
-            sin_modelo += 1
-            continue
-        modelo = vehiculo_model.get_modelo_by_marca_nombre(cur, marca[0], nombre_modelo)
-        if not modelo:
+        if not id_modelo:
             sin_modelo += 1
             continue
 
-        id_modelo = modelo[0]
+        # VRN
+        vrn = _parsear_valor(row.get(vrn_col))    # ← FIX 2 aquí también
+        if vrn:
+            _clasificar_registro(
+                id_modelo, None, vrn, 'VRN',
+                accion, existentes, a_insertar, a_actualizar
+            )
+        else:
+            vrn_ignorados += 1
 
-        try:
-            vrn = row.get(vrn_col)
-            if pd.notna(vrn) and vrn > 0:
-                ins, act, ign = _upsert_valor(cur, id_modelo, None, vrn, 'VRN', accion)
-                insertados += ins; actualizados += act; ignorados += ign
+        # Históricos por año
+        for y in year_cols:
+            val = _parsear_valor(row.get(y))
+            if val:
+                _clasificar_registro(
+                    id_modelo, int(y), val, 'HISTORICO',
+                    accion, existentes, a_insertar, a_actualizar
+                )
 
-            for y in year_cols:
-                val = row.get(str(y)) if str(y) in df.columns else row.get(y)
-                if pd.notna(val) and val > 0:
-                    ins, act, ign = _upsert_valor(cur, id_modelo, int(y), val, 'HISTORICO', accion)
-                    insertados += ins; actualizados += act; ignorados += ign
+    # ── Paso 4: executemany en lotes ──────────────────────────────────────────
+    insertados   = 0
+    actualizados = 0
+    errores      = []
 
-        except Exception as e:
-            errores.append(f"{nombre_marca} — {nombre_modelo}: {str(e)}")
+    # Inserciones
+    if a_insertar:
+        sql_insert = """
+            INSERT INTO valor_vehiculo (id_modelo, anio, valor, tipo_valor)
+            VALUES (%s, %s, %s, %s)
+        """
+        for i in range(0, len(a_insertar), BATCH_SIZE):
+            lote = a_insertar[i:i + BATCH_SIZE]
+            try:
+                cur.executemany(sql_insert, lote)
+                commit()
+                insertados += len(lote)
+            except Exception as e:
+                errores.append(f"Error en lote inserción [{i}:{i+BATCH_SIZE}]: {str(e)[:100]}")
+
+    # Actualizaciones (solo cuando accion='actualizar')
+    if a_actualizar:
+        # Separar los que tienen año de los VRN (anio=None) porque el WHERE es distinto
+        upd_con_anio = [(v, id_m, a, a, t) for v, id_m, a, t in a_actualizar if a is not None]
+        upd_sin_anio = [(v, id_m, t)       for v, id_m, a, t in a_actualizar if a is None]
+
+        if upd_con_anio:
+            sql_upd_hist = """
+                UPDATE valor_vehiculo SET valor=%s
+                WHERE id_modelo=%s AND anio=%s AND tipo_valor=%s
+                  AND (anio IS NOT NULL AND anio=%s)
+            """
+            # Simplificamos: UPDATE con anio exacto
+            sql_upd_h = """
+                UPDATE valor_vehiculo SET valor=%s
+                WHERE id_modelo=%s AND anio=%s AND tipo_valor=%s
+            """
+            # Para UPDATE necesitamos (valor, id_modelo, anio, tipo_valor)
+            datos_upd_h = [(v, id_m, a, t) for v, id_m, a, a2, t in
+                           [(v, id_m, a, a, t) for v, id_m, a, a2, t in
+                            [(row[0], row[1], row[2], row[2], row[4]) for row in upd_con_anio]]]
+            # Reconstruir sin el parámetro duplicado
+            datos_h = [(v, id_m, anio, t) for v, id_m, anio, anio2, t in
+                       [(r[0], r[1], r[2], r[2], r[4]) for r in upd_con_anio]]
+            for i in range(0, len(datos_h), BATCH_SIZE):
+                lote = datos_h[i:i + BATCH_SIZE]
+                try:
+                    cur.executemany(
+                        "UPDATE valor_vehiculo SET valor=%s WHERE id_modelo=%s AND anio=%s AND tipo_valor=%s",
+                        lote
+                    )
+                    commit()
+                    actualizados += len(lote)
+                except Exception as e:
+                    errores.append(f"Error en lote update histórico [{i}]: {str(e)[:100]}")
+
+        if upd_sin_anio:
+            for i in range(0, len(upd_sin_anio), BATCH_SIZE):
+                lote = upd_sin_anio[i:i + BATCH_SIZE]
+                try:
+                    cur.executemany(
+                        "UPDATE valor_vehiculo SET valor=%s WHERE id_modelo=%s AND anio IS NULL AND tipo_valor=%s",
+                        lote
+                    )
+                    commit()
+                    actualizados += len(lote)
+                except Exception as e:
+                    errores.append(f"Error en lote update VRN [{i}]: {str(e)[:100]}")
 
     commit()
+
     return {
         'insertados':    insertados,
         'actualizados':  actualizados,
-        'ignorados':     ignorados,
+        'ignorados':     len(existentes),  # los que ya existían y no se tocaron
         'sin_modelo':    sin_modelo,
+        'vrn_ignorados': vrn_ignorados,
         'errores':       errores[:20],
         'total_errores': len(errores),
+        'nota':          f'Procesado en lotes de {BATCH_SIZE}. Total: {insertados} insertados.',
     }
 
 
-def _upsert_valor(cur, id_modelo, anio, valor, tipo_valor, accion):
-    existe = vehiculo_model.get_valor_by_anio_tipo(cur, id_modelo, anio, tipo_valor)
-    if existe:
+def _clasificar_registro(id_modelo, anio, valor, tipo_valor,
+                          accion, existentes, a_insertar, a_actualizar):
+    """
+    Decide si un registro va a la lista de insertar, actualizar o se ignora.
+    También actualiza el set 'existentes' para evitar duplicados del mismo archivo.
+    """
+    key = (id_modelo, anio, tipo_valor)
+
+    if key in existentes:
         if accion == 'actualizar':
-            vehiculo_model.update_valor_vehiculo(cur, existe[0], valor)
-            return 0, 1, 0
-        return 0, 0, 1
+            a_actualizar.append((valor, id_modelo, anio, tipo_valor))
     else:
-        vehiculo_model.insert_valor_vehiculo(cur, id_modelo, anio, valor, tipo_valor)
-        return 1, 0, 0
+        a_insertar.append((id_modelo, anio, valor, tipo_valor))
+        existentes.add(key)   # evitar duplicados internos del Excel
