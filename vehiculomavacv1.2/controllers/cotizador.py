@@ -11,6 +11,8 @@ from services.cotizacion import calcular_cotizacion
 
 bp = Blueprint('cotizador', __name__)
 
+CATEGORIAS_VALIDAS = {'PICKUP', 'CHINO_HINDU', 'SEDAN', 'SUV'}
+
 
 @bp.route('/cotizador')
 def cotizador():
@@ -40,13 +42,19 @@ def api_cotizar():
     id_modelo        = data.get('id_modelo')
     anio_fabricacion = data.get('anio_fabricacion')
     suma_asegurada   = data.get('suma_asegurada')
+    categoria        = data.get('categoria')  # PICKUP | CHINO_HINDU | SEDAN | SUV
 
     if not id_modelo or not anio_fabricacion:
         return jsonify({'error': 'Faltan datos obligatorios'}), 400
     if not suma_asegurada or float(suma_asegurada) <= 0:
         return jsonify({'error': 'La suma asegurada debe ser mayor a 0'}), 400
+    if not categoria or categoria not in CATEGORIAS_VALIDAS:
+        return jsonify({'error': 'Selecciona una categoría de vehículo válida'}), 400
 
     cur = get_cursor()
-    resultado = calcular_cotizacion(cur, id_modelo, anio_fabricacion, float(suma_asegurada))
+    resultado = calcular_cotizacion(
+        cur, id_modelo, anio_fabricacion,
+        float(suma_asegurada), categoria
+    )
     cur.close()
     return jsonify(resultado)
