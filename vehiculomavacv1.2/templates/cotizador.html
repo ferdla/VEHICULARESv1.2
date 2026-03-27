@@ -12,6 +12,26 @@
                     margin-bottom: 20px; padding-bottom: 10px;
                     border-bottom: 2px solid #e8f0fe; }
 
+/* ── Selector de categoría ──────────────────────────────────────────────── */
+.cat-grid         { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+                    margin-top: 8px; }
+.cat-btn          { border: 2px solid #dee2e6; border-radius: 10px; padding: 12px 8px;
+                    background: #fff; cursor: pointer; text-align: center;
+                    transition: all .2s; font-size: .85rem; font-weight: 600;
+                    color: #555; line-height: 1.3; }
+.cat-btn:hover    { border-color: #00489a; color: #00489a; background: #f0f5ff; }
+.cat-btn.selected { border-color: #00489a; background: #00489a; color: #fff;
+                    box-shadow: 0 4px 12px rgba(0,72,154,.25); }
+.cat-btn .cat-icon { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+.cat-btn.direct   { border-color: #e8a000; }
+.cat-btn.direct.selected { background: #e8a000; border-color: #e8a000; }
+.cat-badge        { font-size: .68rem; font-weight: 700; padding: 2px 6px;
+                    border-radius: 4px; margin-top: 4px; display: inline-block; }
+.cat-badge.direct { background: #fff3cd; color: #856404; }
+.cat-badge.clasif { background: #d4edda; color: #155724; }
+.cat-btn.selected .cat-badge.direct { background: rgba(255,255,255,.3); color: #fff; }
+.cat-btn.selected .cat-badge.clasif { background: rgba(255,255,255,.3); color: #fff; }
+
 /* ── Valor estimado ─────────────────────────────────────────────────────── */
 .valor-badge      { display:inline-flex; align-items:center; gap:8px;
                     background:#e8f0fe; border-radius:8px; padding:10px 16px;
@@ -110,7 +130,7 @@
     <div class="step-card">
         <div class="step-title">② Datos del vehículo</div>
         <div class="row g-3">
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <label class="form-label">Marca</label>
                 <select id="sel_marca" class="form-select">
                     <option value="">-- Seleccione --</option>
@@ -119,16 +139,50 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <label class="form-label">Modelo</label>
                 <select id="sel_modelo" class="form-select" disabled>
                     <option value="">-- Primero seleccione marca --</option>
                 </select>
             </div>
-            <div class="col-md-4">
+
+            <!-- ── CATEGORÍA DE VEHÍCULO (aparece al elegir modelo) ── -->
+            <div class="col-12" id="div_categoria" style="display:none">
+                <label class="form-label fw-semibold">Categoría del vehículo</label>
+                <div class="cat-grid">
+                    <button type="button" class="cat-btn direct" data-cat="CHINO_HINDU"
+                            onclick="seleccionarCategoria(this)">
+                        <span class="cat-icon">🏭</span>
+                        Chino-Hindu
+                        <span class="cat-badge direct">Tasa directa</span>
+                    </button>
+                    <button type="button" class="cat-btn direct" data-cat="PICKUP"
+                            onclick="seleccionarCategoria(this)">
+                        <span class="cat-icon">🛻</span>
+                        Pickup
+                        <span class="cat-badge direct">Tasa directa</span>
+                    </button>
+                    <button type="button" class="cat-btn" data-cat="SEDAN"
+                            onclick="seleccionarCategoria(this)">
+                        <span class="cat-icon">🚗</span>
+                        Sedan / Auto
+                        <span class="cat-badge clasif">Clasificador</span>
+                    </button>
+                    <button type="button" class="cat-btn" data-cat="SUV"
+                            onclick="seleccionarCategoria(this)">
+                        <span class="cat-icon">🚙</span>
+                        SUV
+                        <span class="cat-badge clasif">Clasificador</span>
+                    </button>
+                </div>
+                <input type="hidden" id="inp_categoria" value="">
+            </div>
+
+            <!-- ── AÑO (aparece al elegir categoría) ── -->
+            <div class="col-md-4" id="div_anio" style="display:none">
                 <label class="form-label">Año de fabricación</label>
-                <select id="sel_anio" class="form-select" disabled>
-                    <option value="">-- Seleccione modelo --</option>
+                <select id="sel_anio" class="form-select">
+                    <option value="">-- Seleccione año --</option>
                 </select>
             </div>
         </div>
@@ -206,7 +260,6 @@
         <!-- ══ BOTONES FINALES ══════════════════════════════════════════════ -->
         <div class="step-card" id="card_acciones" style="display:none">
             <div class="step-title">④ Generar documento</div>
-
             <div class="row g-3 align-items-center">
                 <div class="col-md-8">
                     <p class="text-muted mb-2" style="font-size:.9rem;">
@@ -247,7 +300,6 @@
 <script>
 const AÑO_ACTUAL = {{ AÑO_ACTUAL if AÑO_ACTUAL is defined else 2026 }};
 
-// Guardamos los resultados de la cotización para usarlos al guardar
 let ultimosResultados = [];
 let ultimaData        = {};
 
@@ -259,7 +311,6 @@ function llenarAnios() {
         const label = y === AÑO_ACTUAL ? `${y} (0km)` : String(y);
         sel.append($('<option>').val(y).text(label));
     }
-    sel.prop('disabled', false);
 }
 
 // ── Marca → Modelos ───────────────────────────────────────────────────────
@@ -267,12 +318,17 @@ $('#sel_marca').change(function() {
     const id  = $(this).val();
     const sel = $('#sel_modelo');
     sel.empty().append('<option value="">-- Cargando... --</option>').prop('disabled', true);
-    $('#sel_anio').prop('disabled', true);
+
+    // Resetear categoría y año
+    resetearCategoriaYAnio();
     $('#card_suma').hide();
     $('#resultado_wrap').hide();
     ultimosResultados = [];
 
-    if (!id) { sel.html('<option value="">-- Primero seleccione marca --</option>'); return; }
+    if (!id) {
+        sel.html('<option value="">-- Primero seleccione marca --</option>');
+        return;
+    }
     $.getJSON(`/api/modelos_por_marca/${id}`, function(data) {
         sel.empty().append('<option value="">-- Seleccione modelo --</option>');
         data.forEach(m => sel.append($('<option>').val(m.id).text(m.nombre)));
@@ -280,14 +336,48 @@ $('#sel_marca').change(function() {
     }).fail(() => sel.html('<option value="">Error al cargar</option>'));
 });
 
-// ── Modelo → Años ─────────────────────────────────────────────────────────
+// ── Modelo → mostrar selector de categoría ────────────────────────────────
 $('#sel_modelo').change(function() {
-    if (!$(this).val()) return;
-    llenarAnios();
+    resetearCategoriaYAnio();
     $('#card_suma').hide();
     $('#resultado_wrap').hide();
     ultimosResultados = [];
+
+    if (!$(this).val()) return;
+
+    // Mostrar la grilla de categorías
+    $('#div_categoria').show();
+    $('#div_anio').hide();
 });
+
+// ── Seleccionar categoría → mostrar año ───────────────────────────────────
+function seleccionarCategoria(btn) {
+    // Marcar botón seleccionado
+    $('.cat-btn').removeClass('selected');
+    $(btn).addClass('selected');
+
+    const cat = $(btn).data('cat');
+    $('#inp_categoria').val(cat);
+
+    // Mostrar y rellenar el selector de año
+    llenarAnios();
+    $('#div_anio').show();
+
+    // Resetear suma y resultado
+    $('#card_suma').hide();
+    $('#resultado_wrap').hide();
+    $('#inp_suma').val('');
+    $('#valor_estimado_wrap').hide();
+    ultimosResultados = [];
+}
+
+function resetearCategoriaYAnio() {
+    $('.cat-btn').removeClass('selected');
+    $('#inp_categoria').val('');
+    $('#div_categoria').hide();
+    $('#div_anio').hide();
+    $('#sel_anio').empty().append('<option value="">-- Seleccione año --</option>');
+}
 
 // ── Año → Valor estimado ──────────────────────────────────────────────────
 $('#sel_anio').change(function() {
@@ -303,7 +393,7 @@ $('#sel_anio').change(function() {
         if (data.valor) {
             $('#inp_valor_estimado').val(data.valor);
             let fuenteTexto = '';
-            if (data.fuente === 'historico')  fuenteTexto = `📊 Valor histórico del año ${anio}`;
+            if (data.fuente === 'historico')      fuenteTexto = `📊 Valor histórico del año ${anio}`;
             else if (data.fuente === 'calculado') fuenteTexto = `🧮 ${data.nota}`;
             $('#valor_fuente_texto').text(fuenteTexto);
             $('#valor_estimado_wrap').show();
@@ -318,20 +408,28 @@ function usarValorEstimado() {
 
 // ── Cotizar ───────────────────────────────────────────────────────────────
 function cotizar() {
-    const idModelo = $('#sel_modelo').val();
-    const anio     = parseInt($('#sel_anio').val());
-    const suma     = parseFloat($('#inp_suma').val());
+    const idModelo  = $('#sel_modelo').val();
+    const anio      = parseInt($('#sel_anio').val());
+    const suma      = parseFloat($('#inp_suma').val());
+    const categoria = $('#inp_categoria').val();
 
-    if (!idModelo) { alert('Selecciona un modelo.'); return; }
-    if (!anio)     { alert('Selecciona el año de fabricación.'); return; }
-    if (!suma || suma <= 0) { alert('Ingresa una suma asegurada válida.'); return; }
+    if (!idModelo)              { alert('Selecciona un modelo.'); return; }
+    if (!categoria)             { alert('Selecciona una categoría de vehículo.'); return; }
+    if (!anio)                  { alert('Selecciona el año de fabricación.'); return; }
+    if (!suma || suma <= 0)     { alert('Ingresa una suma asegurada válida.'); return; }
 
     const marcaNombre  = $('#sel_marca option:selected').text();
     const modeloNombre = $('#sel_modelo option:selected').text();
     const cliente      = $('#inp_cliente').val().trim();
     const placa        = $('#inp_placa').val().trim();
 
-    $('#res_marca_modelo').text(`${marcaNombre} ${modeloNombre} ${anio}`);
+    // Etiqueta legible de la categoría
+    const catLabels = {
+        PICKUP: 'Pickup', CHINO_HINDU: 'Chino-Hindu',
+        SEDAN: 'Sedan/Auto', SUV: 'SUV'
+    };
+
+    $('#res_marca_modelo').text(`${marcaNombre} ${modeloNombre} ${anio} — ${catLabels[categoria]}`);
     let clienteTexto = cliente || 'Cliente no especificado';
     if (placa) clienteTexto += ` — ${placa}`;
     $('#res_cliente').text(clienteTexto);
@@ -352,11 +450,11 @@ function cotizar() {
         document.getElementById('resultado_wrap').scrollIntoView({behavior:'smooth'});
     }, 100);
 
-    // Guardar datos para usar al generar documento
     ultimaData = {
         id_modelo:        parseInt(idModelo),
         anio_fabricacion: anio,
         suma_asegurada:   suma,
+        categoria:        categoria,
         nombre_cliente:   $('#inp_cliente').val().trim(),
         dni_ruc:          $('#inp_dni').val().trim(),
         placa:            $('#inp_placa').val().trim(),
@@ -371,11 +469,11 @@ function cotizar() {
             id_modelo:        parseInt(idModelo),
             anio_fabricacion: anio,
             suma_asegurada:   suma,
+            categoria:        categoria,
         }),
         success: function(data) {
             ultimosResultados = data.resultados;
             renderTabla(data);
-            // Mostrar sección de generar documento
             $('#card_acciones').show();
         },
         error: function(xhr) {
@@ -398,7 +496,8 @@ function renderTabla(data) {
             <div class="alerta-no-aseg">
                 ⚠️ <strong>Vehículo no asegurable</strong> — Este vehículo no tiene cobertura
                 en ninguna de las 4 aseguradoras con los datos ingresados.
-                <br><small class="text-muted mt-1 d-block">Verifica las reglas de clasificación en el módulo Clasificador de Riesgos.</small>
+                <br><small class="text-muted mt-1 d-block">Verifica las reglas de clasificación
+                en el módulo Clasificador de Riesgos.</small>
             </div>
         `);
         return;
@@ -406,17 +505,18 @@ function renderTabla(data) {
 
     let filas = '';
     resultados.forEach(r => {
-        const esMejor    = r.prima !== null && r.prima === primaMin && primasValidas.length > 1;
-        const clsFila    = esMejor ? 'mejor-precio' : '';
-        const badgeClass = getBadgeClass(r.tipo_riesgo);
+        const esMejor     = r.prima !== null && r.prima === primaMin && primasValidas.length > 1;
+        const clsFila     = esMejor ? 'mejor-precio' : '';
+        const badgeClass  = getBadgeClass(r.tipo_riesgo);
         const badgeRiesgo = `<span class="badge-riesgo ${badgeClass}">${r.tipo_riesgo}</span>`;
-        const tasaTxt    = r.tasa !== null
+        const tasaTxt     = r.tasa !== null
             ? `${parseFloat(r.tasa).toFixed(4)}%`
             : `<span class="prima-na">—</span>`;
         let primaTxt = '';
         if (r.prima !== null) {
             const corona = esMejor ? '<span class="corona-icon"> ✅</span>' : '';
-            primaTxt = `<span class="prima-valor">$ ${r.prima.toLocaleString('es-PE', {minimumFractionDigits:2})}${corona}</span>`;
+            primaTxt = `<span class="prima-valor">$ ${r.prima.toLocaleString('es-PE',
+                {minimumFractionDigits:2})}${corona}</span>`;
         } else if (!r.asegurable) {
             primaTxt = `<span class="prima-na">No asegurable</span>`;
         } else {
@@ -436,7 +536,8 @@ function renderTabla(data) {
 
     let notaPie = '';
     if (primaMin !== null && primasValidas.length > 1) {
-        notaPie = `<div class="text-muted small mt-2 text-end"> ✅ Prima más baja entre las aseguradoras disponibles</div>`;
+        notaPie = `<div class="text-muted small mt-2 text-end">
+            ✅ Prima más baja entre las aseguradoras disponibles</div>`;
     }
 
     $('#tabla_wrap').html(`
@@ -469,7 +570,7 @@ function getBadgeClass(tipo) {
     return 'badge-no';
 }
 
-// ── Generar documento de cotización ───────────────────────────────────────
+// ── Generar documento ─────────────────────────────────────────────────────
 function generarDocumento() {
     if (!ultimosResultados.length) {
         alert('Primero realiza una cotización.');
@@ -479,10 +580,7 @@ function generarDocumento() {
     $('#btn_generar').prop('disabled', true).text('Generando...');
     $('#guardando_wrap').show();
 
-    const payload = {
-        ...ultimaData,
-        resultados: ultimosResultados,
-    };
+    const payload = { ...ultimaData, resultados: ultimosResultados };
 
     $.ajax({
         url: '/api/guardar_cotizacion',
@@ -491,7 +589,6 @@ function generarDocumento() {
         data: JSON.stringify(payload),
         success: function(r) {
             if (r.ok) {
-                // Redirigir al documento generado
                 window.location.href = `/documento/cotizacion/${r.id_cotizacion}`;
             } else {
                 alert('Error al guardar: ' + r.error);
@@ -513,6 +610,7 @@ function nuevaCotizacion() {
     $('#card_suma').hide();
     $('#card_acciones').hide();
     $('#inp_suma, #inp_cliente, #inp_placa, #inp_dni, #inp_email').val('');
+    resetearCategoriaYAnio();
     $('#sel_marca').val('').trigger('change');
     ultimosResultados = [];
     ultimaData = {};
