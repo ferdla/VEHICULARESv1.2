@@ -4,7 +4,7 @@
 # =============================================================================
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from database import get_cursor, commit, get_last_insert_id  # ← centralizado
+from database import get_cursor, commit, get_last_insert_id
 import models.empresa as empresa_model
 import models.vehiculo as vehiculo_model
 import models.clasificacion as clasificacion_model
@@ -128,10 +128,9 @@ def _crear_regla_confirmada(cur, id_empresa, id_tipo_riesgo, id_marca,
     )
     commit()
 
-    # Si el modelo específico no existe aún → excepcion_pendiente
     if nombre_modelo_nuevo and not id_modelo and id_modelo_final is None:
         if not vehiculo_model.get_modelo_by_marca_nombre(cur, id_marca, nombre_modelo_nuevo):
-            id_rc = get_last_insert_id(cur)  # ← id de regla_clasificacion, desde database.py
+            id_rc = get_last_insert_id(cur)
             clasificacion_model.insert_excepcion_pendiente(
                 cur, id_rc, nombre_modelo_nuevo, 'INCLUIR_SOLO', None,
                 f'Modelo específico pendiente: {nombre_modelo_nuevo}'
@@ -140,7 +139,7 @@ def _crear_regla_confirmada(cur, id_empresa, id_tipo_riesgo, id_marca,
 
 
 # ==============================================================================
-# AGREGAR EXCEPCIÓN
+# AGREGAR EXCEPCIÓN — ahora acepta múltiples patrones a la vez
 # ==============================================================================
 
 @bp.route('/clasificador_riesgos/agregar_excepcion', methods=['POST'])
@@ -148,44 +147,66 @@ def agregar_excepcion():
     cur = get_cursor()
     try:
         id_regla    = request.form['id_regla_clasificacion']
-        texto       = request.form['texto_modelo'].strip()
         tipo_exc    = request.form['tipo_excepcion']
         nota_exc    = request.form.get('nota_excepcion') or None
         id_tipo_alt = request.form.get('id_tipo_riesgo_alternativo') or None
         if id_tipo_alt == '0':
             id_tipo_alt = None
 
+        # Recoger todos los patrones enviados (campos texto_modelo[], puede ser uno o varios)
+        textos_raw = request.form.getlist('texto_modelo[]')
+        # Limpiar y filtrar vacíos
+        textos = [t.strip() for t in textos_raw if t.strip()]
+
+        if not textos:
+            flash('Debes ingresar al menos un modelo o patrón.', 'danger')
+            return redirect(url_for('clasificador.clasificador_riesgos'))
+
         id_marca = clasificacion_model.get_id_marca_de_regla(cur, id_regla)
         if not id_marca:
             flash('Regla no encontrada.', 'danger')
             return redirect(url_for('clasificador.clasificador_riesgos'))
 
-        # Aplicar a modelos existentes
-        ids_modelos = clasificacion_model.get_modelos_existentes_para_excepcion(cur, id_marca, texto)
-        inserted = 0
-        for id_modelo in ids_modelos:
-            try:
-                clasificacion_model.upsert_excepcion_confirmada(
-                    cur, id_regla, id_modelo, tipo_exc, id_tipo_alt, nota_exc
-                )
-                inserted += 1
-            except Exception:
-                pass
+        total_inserted = 0
+        total_pendientes = 0
 
-        # Siempre guardar en pendiente para modelos futuros
-        if clasificacion_model.count_excepcion_pendiente_existente(cur, id_regla, texto) == 0:
-            clasificacion_model.insert_excepcion_pendiente(
-                cur, id_regla, texto, tipo_exc, id_tipo_alt, nota_exc
+        for texto in textos:
+            # Aplicar a modelos existentes que coincidan con el patrón
+            ids_modelos = clasificacion_model.get_modelos_existentes_para_excepcion(
+                cur, id_marca, texto
             )
+            for id_modelo in ids_modelos:
+                try:
+                    clasificacion_model.upsert_excepcion_confirmada(
+                        cur, id_regla, id_modelo, tipo_exc, id_tipo_alt, nota_exc
+                    )
+                    total_inserted += 1
+                except Exception:
+                    pass
+
+            # Guardar patrón pendiente para modelos futuros (si no existe ya)
+            if clasificacion_model.count_excepcion_pendiente_existente(cur, id_regla, texto) == 0:
+                clasificacion_model.insert_excepcion_pendiente(
+                    cur, id_regla, texto, tipo_exc, id_tipo_alt, nota_exc
+                )
+                total_pendientes += 1
 
         commit()
 
-        if inserted > 0:
-            flash(f'Se aplicaron {inserted} excepción(es) a modelos existentes con "{texto}". '
-                  f'Patrón guardado también para modelos futuros.', 'success')
+        n = len(textos)
+        if total_inserted > 0:
+            flash(
+                f'{n} patrón(es) procesado(s). '
+                f'{total_inserted} excepción(es) aplicada(s) a modelos existentes. '
+                f'{total_pendientes} patrón(es) guardado(s) para modelos futuros.',
+                'success'
+            )
         else:
-            flash(f'No hay modelos existentes con "{texto}". '
-                  f'Excepción guardada como pendiente.', 'warning')
+            flash(
+                f'{n} patrón(es) guardado(s) como pendiente(s) '
+                f'(no se encontraron modelos existentes con esos nombres).',
+                'warning'
+            )
 
     except Exception as e:
         flash(f'Error: {e}', 'danger')
