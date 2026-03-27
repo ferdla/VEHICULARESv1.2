@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Clasificador de Riesgos{% endblock %}
 
+{% block extra_head %}
+<style>
+.patron-row        { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.patron-row input  { flex:1; }
+.btn-remove-patron { border:none; background:transparent; color:#dc3545;
+                     font-size:1.2rem; line-height:1; cursor:pointer; padding:0 4px;
+                     transition:color .15s; }
+.btn-remove-patron:hover { color:#a71d2a; }
+.btn-add-patron    { font-size:.85rem; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container my-4">
     <h2 class="text-primary mb-4">Clasificador de Riesgos Vehiculares</h2>
@@ -237,24 +249,14 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+
+                <!-- ── FORMULARIO MULTI-EXCEPCIÓN ── -->
                 <form id="formExcepcion"
                       action="{{ url_for('clasificador.agregar_excepcion') }}" method="POST">
-                    <!--
-                        CORREGIDO: antes decía name="id_riesgo_vehiculo"
-                        Ahora coincide con lo que lee clasificador.py:
-                        request.form['id_regla_clasificacion']
-                    -->
                     <input type="hidden" name="id_regla_clasificacion" id="ex_id_regla_hidden">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Inicio del nombre del modelo</label>
-                            <input type="text" class="form-control" name="texto_modelo"
-                                   placeholder="Ej: R8, Sentra, Festiva" required>
-                            <small class="text-muted">
-                                Se aplicará a modelos cuyo nombre comience con este texto.
-                                Si el modelo no existe aún, quedará guardado como pendiente.
-                            </small>
-                        </div>
+
+                    <!-- Acción y riesgo alternativo (compartidos por todos los patrones) -->
+                    <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Acción</label>
                             <select class="form-select" name="tipo_excepcion" required>
@@ -270,12 +272,36 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Nota (opcional)</label>
-                            <input type="text" class="form-control" name="nota_excepcion">
+                            <label class="form-label">Nota (opcional, aplica a todos)</label>
+                            <input type="text" class="form-control" name="nota_excepcion"
+                                   placeholder="Ej: Modelos con turbo de alta gama">
                         </div>
                     </div>
+
+                    <!-- Lista dinámica de patrones -->
+                    <label class="form-label fw-semibold">
+                        Modelos / Patrones
+                        <small class="text-muted fw-normal ms-1">
+                            (inicio del nombre — se aplicará a modelos que comiencen con este texto)
+                        </small>
+                    </label>
+                    <div id="lista_patrones">
+                        <!-- Primera fila siempre visible -->
+                        <div class="patron-row">
+                            <input type="text" class="form-control" name="texto_modelo[]"
+                                   placeholder="Ej: R8, Sentra, Festiva" required>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-outline-secondary btn-sm btn-add-patron mt-2"
+                            onclick="agregarPatron()">
+                        + Agregar otro modelo
+                    </button>
+
                     <div class="mt-3">
-                        <button type="submit" class="btn btn-primary">Agregar Excepción</button>
+                        <button type="submit" class="btn btn-primary">
+                            Guardar excepción(es)
+                        </button>
                     </div>
                 </form>
 
@@ -356,10 +382,36 @@ $('.delete-regla-pend').on('submit', function(e) {
     }).then(r => { if (r.isConfirmed) f.submit(); });
 });
 
+// ── Agregar / quitar filas de patrón ─────────────────────────────────────────
+function agregarPatron() {
+    const fila = $(`
+        <div class="patron-row">
+            <input type="text" class="form-control" name="texto_modelo[]"
+                   placeholder="Ej: Civic, Corolla, 3008...">
+            <button type="button" class="btn-remove-patron" onclick="quitarPatron(this)"
+                    title="Eliminar">×</button>
+        </div>
+    `);
+    $('#lista_patrones').append(fila);
+    fila.find('input').focus();
+}
+
+function quitarPatron(btn) {
+    // No eliminar si es la única fila
+    if ($('#lista_patrones .patron-row').length > 1) {
+        $(btn).closest('.patron-row').remove();
+    }
+}
+
+// Al abrir el modal, limpiar las filas extra y dejar solo la primera
+$('#modalExcepciones').on('show.bs.modal', function() {
+    $('#lista_patrones .patron-row:not(:first)').remove();
+    $('#lista_patrones input').first().val('');
+});
+
 // ── Modal excepciones ─────────────────────────────────────────────────────────
 function verExcepciones(idRegla, empresaId) {
     $('#ex_id_regla').text(idRegla);
-    // CORREGIDO: antes llenaba #ex_id_riesgo, ahora llena #ex_id_regla_hidden
     $('#ex_id_regla_hidden').val(idRegla);
 
     const sel = $('#select_tipo_alternativo');
