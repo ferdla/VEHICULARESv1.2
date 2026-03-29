@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Usuarios — MAVAC{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show">
+            {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="bg-white shadow rounded p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="text-primary mb-0">Gestión de Usuarios</h2>
+                <small class="text-muted">{{ usuarios|length }} usuario(s) registrado(s)</small>
+            </div>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalCrearUsuario">
+                + Nuevo Usuario
+            </button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-bordered align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Rol</th>
+                        <th>Activo</th>
+                        <th>Fecha creación</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    {# u: id_usuario[0], username[1], rol[2], activo[3], fecha_creacion[4] #}
+                    <tr {% if u[0] == session.id_usuario %}class="table-primary"{% endif %}>
+                        <td>{{ u[0] }}</td>
+                        <td class="fw-semibold">
+                            {{ u[1] }}
+                            {% if u[0] == session.id_usuario %}
+                                <span class="badge bg-primary ms-1" style="font-size:.7rem">Tú</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u[2] == 'admin' %}
+                                <span class="badge bg-danger">Admin</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Trabajador</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if u[3] %}
+                                <span class="badge bg-success">Activo</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ u[4].strftime('%d/%m/%Y') if u[4] else '-' }}</td>
+                        <td class="text-center">
+                            <!-- Botón editar rol/activo -->
+                            <button class="btn btn-warning btn-sm"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modalEditarUsuario{{ u[0] }}">
+                                Editar
+                            </button>
+                            <!-- Botón cambiar password -->
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modalPassword{{ u[0] }}">
+                                🔑 Password
+                            </button>
+                            <!-- Eliminar -->
+                            {% if u[0] != session.id_usuario %}
+                            <form action="{{ url_for('auth.eliminar_usuario', id_usuario=u[0]) }}"
+                                  method="POST" class="delete-user-form d-inline">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== MODAL CREAR USUARIO ===== -->
+    <div class="modal fade" id="modalCrearUsuario" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Nuevo Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('auth.crear_usuario') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" name="username"
+                               required placeholder="Ej: jperez">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" name="password"
+                               required placeholder="Mínimo 6 caracteres" minlength="6">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rol</label>
+                        <select class="form-select" name="rol">
+                            <option value="trabajador">Trabajador</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Crear Usuario</button>
+                </form>
+            </div>
+        </div></div>
+    </div>
+
+    <!-- ===== MODALES EDITAR USUARIO ===== -->
+    {% for u in usuarios %}
+    <div class="modal fade" id="modalEditarUsuario{{ u[0] }}" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Editar — {{ u[1] }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('auth.editar_usuario', id_usuario=u[0]) }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Rol</label>
+                        <select class="form-select" name="rol">
+                            <option value="trabajador" {{ 'selected' if u[2]=='trabajador' else '' }}>
+                                Trabajador
+                            </option>
+                            <option value="admin" {{ 'selected' if u[2]=='admin' else '' }}>
+                                Administrador
+                            </option>
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="activo"
+                               {{ 'checked' if u[3] else '' }}>
+                        <label class="form-check-label">Activo</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                </form>
+            </div>
+        </div></div>
+    </div>
+
+    <!-- Modal cambiar password -->
+    <div class="modal fade" id="modalPassword{{ u[0] }}" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🔑 Cambiar Password — {{ u[1] }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('auth.cambiar_password', id_usuario=u[0]) }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Nueva contraseña</label>
+                        <input type="password" class="form-control" name="nuevo_password"
+                               required placeholder="Mínimo 6 caracteres" minlength="6">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
+                </form>
+            </div>
+        </div></div>
+    </div>
+    {% endfor %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+$('.delete-user-form').on('submit', function(e) {
+    e.preventDefault();
+    const f = this;
+    Swal.fire({
+        title: '¿Eliminar usuario?',
+        text: 'Esta acción no se puede deshacer.',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#d33', confirmButtonText: 'Sí, eliminar'
+    }).then(r => { if (r.isConfirmed) f.submit(); });
+});
+</script>
+{% endblock %}
