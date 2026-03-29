@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión — MAVAC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --azul:       #00489a;
+            --azul-dark:  #002f6c;
+            --azul-light: #e8f0fe;
+            --accent:     #f0a500;
+            --text:       #1a1a2e;
+            --muted:      #6b7280;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            background: #f4f7fb;
+        }
+
+        /* ── Panel izquierdo ── */
+        .panel-left {
+            width: 52%;
+            background: var(--azul-dark);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            padding: 60px 48px;
+        }
+
+        /* Fondo con patrón geométrico sutil */
+        .panel-left::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(0,72,154,.6) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(240,165,0,.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(0,47,108,.8) 0%, transparent 55%);
+        }
+
+        /* Círculos decorativos */
+        .deco-circle {
+            position: absolute;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,.08);
+        }
+        .deco-circle-1 { width: 420px; height: 420px; top: -120px; left: -120px; }
+        .deco-circle-2 { width: 280px; height: 280px; bottom: -80px; right: -60px; }
+        .deco-circle-3 { width: 160px; height: 160px; top: 40%; right: 40px;
+                         border-color: rgba(240,165,0,.2); }
+
+        /* Línea diagonal decorativa */
+        .deco-line {
+            position: absolute;
+            width: 200%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.1), transparent);
+            transform: rotate(-20deg);
+            top: 35%;
+            left: -50%;
+        }
+
+        .panel-left-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+        }
+
+        .logo-wrap {
+            margin-bottom: 40px;
+            animation: fadeSlideUp .8s ease both;
+        }
+        .logo-wrap img {
+            max-width: 220px;
+            filter: brightness(0) invert(1);
+            opacity: .95;
+        }
+
+        .brand-titulo {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2.6rem;
+            color: #fff;
+            line-height: 1.15;
+            margin-bottom: 16px;
+            animation: fadeSlideUp .8s .1s ease both;
+        }
+        .brand-titulo span { color: var(--accent); }
+
+        .brand-sub {
+            font-size: .95rem;
+            color: rgba(255,255,255,.6);
+            letter-spacing: .04em;
+            line-height: 1.6;
+            max-width: 340px;
+            animation: fadeSlideUp .8s .2s ease both;
+        }
+
+        /* Badges de módulos */
+        .modulos-wrap {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 40px;
+            animation: fadeSlideUp .8s .3s ease both;
+        }
+        .modulo-badge {
+            background: rgba(255,255,255,.1);
+            border: 1px solid rgba(255,255,255,.15);
+            color: rgba(255,255,255,.8);
+            font-size: .75rem;
+            padding: 6px 14px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+            letter-spacing: .03em;
+        }
+
+        /* ── Panel derecho ── */
+        .panel-right {
+            width: 48%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 48px;
+            background: #f4f7fb;
+            position: relative;
+        }
+
+        /* Textura sutil */
+        .panel-right::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(0,72,154,.04) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            z-index: 2;
+            animation: fadeSlideUp .7s .15s ease both;
+        }
+
+        .login-eyebrow {
+            font-size: .75rem;
+            font-weight: 600;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--azul);
+            margin-bottom: 8px;
+        }
+
+        .login-titulo {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2rem;
+            color: var(--text);
+            margin-bottom: 8px;
+            line-height: 1.2;
+        }
+
+        .login-sub {
+            font-size: .88rem;
+            color: var(--muted);
+            margin-bottom: 36px;
+        }
+
+        /* Campos */
+        .campo-wrap {
+            margin-bottom: 20px;
+        }
+        .campo-wrap label {
+            display: block;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 7px;
+            letter-spacing: .02em;
+        }
+        .campo-inner {
+            position: relative;
+        }
+        .campo-inner .campo-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            font-size: 1rem;
+            pointer-events: none;
+        }
+        .campo-inner input {
+            width: 100%;
+            padding: 13px 16px 13px 42px;
+            border: 1.5px solid #dde3ed;
+            border-radius: 10px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: .92rem;
+            color: var(--text);
+            background: #fff;
+            transition: all .2s;
+            outline: none;
+        }
+        .campo-inner input:focus {
+            border-color: var(--azul);
+            box-shadow: 0 0 0 3px rgba(0,72,154,.1);
+        }
+        .campo-inner input::placeholder { color: #b0bac8; }
+
+        /* Toggle password */
+        .toggle-pwd {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: .9rem;
+            padding: 0;
+            transition: color .2s;
+        }
+        .toggle-pwd:hover { color: var(--azul); }
+
+        /* Botón submit */
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: var(--azul);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: .95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            letter-spacing: .02em;
+            margin-top: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-login::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,.1), transparent);
+        }
+        .btn-login:hover {
+            background: var(--azul-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(0,72,154,.3);
+        }
+        .btn-login:active { transform: translateY(0); }
+
+        /* Alerts */
+        .alert-login {
+            border-radius: 10px;
+            font-size: .85rem;
+            padding: 10px 14px;
+            margin-bottom: 20px;
+            border: none;
+        }
+        .alert-danger  { background: #fef2f2; color: #b91c1c; }
+        .alert-warning { background: #fffbeb; color: #92400e; }
+        .alert-success { background: #f0fdf4; color: #166534; }
+
+        /* Footer del form */
+        .login-footer {
+            margin-top: 28px;
+            text-align: center;
+            font-size: .78rem;
+            color: var(--muted);
+        }
+
+        /* Animación */
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { flex-direction: column; overflow: auto; }
+            .panel-left  { width: 100%; min-height: 220px; padding: 32px 24px; }
+            .panel-right { width: 100%; padding: 40px 24px; }
+            .brand-titulo { font-size: 1.8rem; }
+            .modulos-wrap { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── Panel izquierdo — Logo y branding ── -->
+    <div class="panel-left">
+        <div class="deco-circle deco-circle-1"></div>
+        <div class="deco-circle deco-circle-2"></div>
+        <div class="deco-circle deco-circle-3"></div>
+        <div class="deco-line"></div>
+
+        <div class="panel-left-content">
+            <div class="logo-wrap">
+                <img src="{{ url_for('static', filename='img/mavaclogoparte3.png') }}"
+                     alt="MAVAC Corredores de Seguros">
+            </div>
+
+            <h1 class="brand-titulo">
+                Sistema de<br><span>Cotización</span><br>Vehicular
+            </h1>
+            <p class="brand-sub">
+                Plataforma de gestión y cotización para<br>
+                corredores de seguros vehiculares.
+            </p>
+
+            <div class="modulos-wrap">
+                <span class="modulo-badge">Cotizador</span>
+                <span class="modulo-badge">Historial</span>
+                <span class="modulo-badge">Clasificador</span>
+                <span class="modulo-badge">Tasas</span>
+                <span class="modulo-badge">Coberturas</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Panel derecho — Formulario ── -->
+    <div class="panel-right">
+        <div class="login-card">
+            <div class="login-eyebrow">Bienvenido</div>
+            <h2 class="login-titulo">Iniciar sesión</h2>
+            <p class="login-sub">Ingresa tus credenciales para continuar.</p>
+
+            <!-- Mensajes flash -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert-login alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('auth.login') }}">
+                <!-- Username -->
+                <div class="campo-wrap">
+                    <label for="username">Usuario</label>
+                    <div class="campo-inner">
+                        <span class="campo-icon">👤</span>
+                        <input type="text" id="username" name="username"
+                               placeholder="Tu nombre de usuario"
+                               autocomplete="username"
+                               value="{{ request.form.get('username', '') }}"
+                               required autofocus>
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div class="campo-wrap">
+                    <label for="password">Contraseña</label>
+                    <div class="campo-inner">
+                        <span class="campo-icon">🔒</span>
+                        <input type="password" id="password" name="password"
+                               placeholder="Tu contraseña"
+                               autocomplete="current-password"
+                               required>
+                        <button type="button" class="toggle-pwd" onclick="togglePassword()"
+                                id="btn-toggle-pwd" title="Mostrar/ocultar contraseña">
+                            👁
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    Ingresar al sistema →
+                </button>
+            </form>
+
+            <div class="login-footer">
+                MAVAC Corredores de Seguros S.A.C. &copy; {{ 2026 }}<br>
+                <span style="color:#b0bac8;">v1.2</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function togglePassword() {
+        const inp = document.getElementById('password');
+        const btn = document.getElementById('btn-toggle-pwd');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            btn.textContent = '🙈';
+        } else {
+            inp.type = 'password';
+            btn.textContent = '👁';
+        }
+    }
+
+    // Enter en username pasa al password
+    document.getElementById('username').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('password').focus();
+        }
+    });
+    </script>
+</body>
+</html>
