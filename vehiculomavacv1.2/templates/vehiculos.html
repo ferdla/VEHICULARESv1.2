@@ -1,6 +1,120 @@
 {% extends "base.html" %}
 {% block title %}Vehículos - Modelos{% endblock %}
 
+{% block extra_head %}
+<style>
+/* ── Modal valores ───────────────────────────────────────────────────────── */
+.valor-section-title {
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #00489a;
+    padding: 6px 0;
+    border-bottom: 2px solid #e8f0fe;
+    margin-bottom: 14px;
+}
+.vrn-card {
+    background: #f0f5ff;
+    border: 1px solid #d0e0ff;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+}
+.historico-row {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.historico-row label {
+    font-size: .82rem;
+    color: #555;
+    margin: 0;
+}
+.btn-remove-hist {
+    border: none;
+    background: transparent;
+    color: #dc3545;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 4px;
+    border-radius: 4px;
+    transition: all .15s;
+    line-height: 1;
+}
+.btn-remove-hist:hover { background: #fff0f0; }
+.btn-add-hist {
+    font-size: .85rem;
+    border: 1px dashed #00489a;
+    color: #00489a;
+    background: transparent;
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .2s;
+    width: 100%;
+    margin-top: 4px;
+}
+.btn-add-hist:hover { background: #e8f0fe; }
+
+/* ── Tabla de valores existentes ─────────────────────────────────────────── */
+.tabla-valores {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .88rem;
+    margin-top: 8px;
+}
+.tabla-valores th {
+    background: #1e3a5f;
+    color: #fff;
+    padding: 7px 12px;
+    text-align: left;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.tabla-valores td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+.tabla-valores tr:last-child td { border-bottom: none; }
+.tabla-valores tr:hover td { background: #f8f9ff; }
+.badge-vrn {
+    background: #d4edda; color: #155724;
+    font-size: .72rem; padding: 2px 7px;
+    border-radius: 4px; font-weight: 700;
+}
+.badge-hist {
+    background: #cce5ff; color: #004085;
+    font-size: .72rem; padding: 2px 7px;
+    border-radius: 4px; font-weight: 700;
+}
+.valor-editable-inline {
+    border: none;
+    background: transparent;
+    font-size: .88rem;
+    width: 110px;
+    text-align: right;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+.valor-editable-inline:focus {
+    background: #fff;
+    border: 1px solid #00489a;
+    outline: none;
+}
+
+/* ── Botón valores en tabla ──────────────────────────────────────────────── */
+.btn-valores {
+    font-size: .78rem;
+    padding: 3px 10px;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container my-4">
 
@@ -58,12 +172,16 @@
                 <tbody class="text-center">
                     {% if modelos %}
                         {% for mod in modelos %}
-                        {# mod: (id_modelo[0], nombre_marca[1], nombre_modelo[2], comentario[3], id_marca[4]) #}
                         <tr>
                             <td class="fw-semibold">{{ mod[1] }}</td>
                             <td>{{ mod[2] }}</td>
                             <td>{{ mod[3] or '-' }}</td>
                             <td class="text-center">
+                                <!-- Botón Valores -->
+                                <button class="btn btn-outline-primary btn-sm btn-valores"
+                                        onclick="abrirModalValores({{ mod[0] }}, '{{ mod[1] }} {{ mod[2] }}')">
+                                    💰 Valores
+                                </button>
                                 <button class="btn btn-warning btn-sm"
                                         data-bs-toggle="modal"
                                         data-bs-target="#modalEditarModelo{{ mod[0] }}">Editar</button>
@@ -152,7 +270,74 @@
     </div>
 
 
-    <!-- ===== MODAL REGLAS PENDIENTES (marca nueva) ===== -->
+    <!-- ===== MODAL VALORES VEHICULARES ===== -->
+    <div class="modal fade" id="modalValores" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">
+                    💰 Valores — <span id="val_nombre_modelo"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- ── Valores existentes ── -->
+                <div class="valor-section-title">Valores registrados</div>
+                <div id="tabla_valores_wrap">
+                    <p class="text-muted small">Cargando...</p>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- ── Ingresar nuevos valores ── -->
+                <div class="valor-section-title">Agregar / actualizar valores</div>
+
+                <!-- VRN -->
+                <div class="vrn-card">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="flex-fill">
+                            <label class="form-label fw-semibold mb-1">
+                                VRN — Valor 0km
+                                <small class="text-muted fw-normal ms-1">(precio de lista en USD)</small>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" id="inp_vrn" class="form-control"
+                                       placeholder="Ej: 25000" min="0" step="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Históricos -->
+                <div class="mb-2">
+                    <label class="form-label fw-semibold">
+                        Valores históricos por año
+                        <small class="text-muted fw-normal ms-1">(USD)</small>
+                    </label>
+                    <div id="lista_historicos">
+                        <!-- Filas dinámicas -->
+                    </div>
+                    <button type="button" class="btn-add-hist" onclick="agregarFilaHistorico()">
+                        + Agregar año
+                    </button>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button class="btn btn-primary" onclick="guardarValores()">
+                        💾 Guardar valores
+                    </button>
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        Cerrar
+                    </button>
+                </div>
+                <div id="val_feedback" class="mt-3" style="display:none"></div>
+            </div>
+        </div></div>
+    </div>
+
+
+    <!-- ===== MODAL REGLAS PENDIENTES ===== -->
     <div class="modal fade" id="modalReglasPendientes" tabindex="-1"
          aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg"><div class="modal-content">
@@ -174,7 +359,7 @@
     </div>
 
 
-    <!-- ===== MODAL EXCEPCIONES PENDIENTES (modelo nuevo) ===== -->
+    <!-- ===== MODAL EXCEPCIONES PENDIENTES ===== -->
     <div class="modal fade" id="modalExcepcionesPendientes" tabindex="-1"
          aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg"><div class="modal-content">
@@ -239,6 +424,10 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+const AÑO_ACTUAL = new Date().getFullYear();
+let idModeloValores = null; // ID del modelo activo en el modal de valores
+
+// ── Utilidades ────────────────────────────────────────────────────────────────
 function limpiarFiltros() {
     window.location.href = "{{ url_for('vehiculos.vehiculos') }}";
 }
@@ -259,7 +448,10 @@ $('.delete-form').on('submit', function(e) {
     }).then(r => { if (r.isConfirmed) form.submit(); });
 });
 
-// ── Agregar modelo via AJAX ───────────────────────────────────────────────────
+
+// ==============================================================================
+// AGREGAR MODELO via AJAX
+// ==============================================================================
 $('#formAgregarModelo').on('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);
@@ -278,6 +470,23 @@ $('#formAgregarModelo').on('submit', function(e) {
                 mostrarReglasPendientes(response.reglas_pend, response.id_marca, response.id_modelo);
             } else if (response.tipo === 'excepciones_pendientes') {
                 mostrarExcepcionesPendientes(response.pendientes, response.id_modelo);
+            } else if (response.tipo === 'modelo_creado') {
+                // Modelo creado sin pendientes → preguntar si quiere ingresar valores
+                Swal.fire({
+                    title: `✅ "${response.nombre_modelo}" agregado`,
+                    text: '¿Deseas ingresar los valores vehiculares ahora?',
+                    icon: 'success',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, ingresar valores',
+                    cancelButtonText: 'No, después',
+                    confirmButtonColor: '#00489a',
+                }).then(r => {
+                    if (r.isConfirmed) {
+                        abrirModalValores(response.id_modelo, response.nombre_modelo);
+                    } else {
+                        window.location.reload();
+                    }
+                });
             } else {
                 window.location.reload();
             }
@@ -286,7 +495,213 @@ $('#formAgregarModelo').on('submit', function(e) {
     });
 });
 
-// ── REGLAS PENDIENTES ─────────────────────────────────────────────────────────
+
+// ==============================================================================
+// MODAL VALORES VEHICULARES
+// ==============================================================================
+
+function abrirModalValores(idModelo, nombreModelo) {
+    idModeloValores = idModelo;
+    $('#val_nombre_modelo').text(nombreModelo);
+    $('#inp_vrn').val('');
+    $('#lista_historicos').empty();
+    $('#val_feedback').hide();
+    cargarValoresExistentes(idModelo);
+    $('#modalValores').modal('show');
+}
+
+function cargarValoresExistentes(idModelo) {
+    $('#tabla_valores_wrap').html('<p class="text-muted small">Cargando...</p>');
+    $.getJSON(`/api/valores_modelo/${idModelo}`, function(data) {
+        if (!data.ok || !data.valores.length) {
+            $('#tabla_valores_wrap').html(
+                '<p class="text-muted small fst-italic">Sin valores registrados aún.</p>'
+            );
+            return;
+        }
+        let filas = '';
+        data.valores.forEach(v => {
+            const badge   = v.tipo_valor === 'VRN'
+                ? '<span class="badge-vrn">VRN</span>'
+                : '<span class="badge-hist">HIST</span>';
+            const anioTxt = v.tipo_valor === 'VRN' ? '0km' : v.anio;
+            filas += `
+                <tr id="val-row-${v.id_valor}">
+                    <td>${badge}</td>
+                    <td>${anioTxt}</td>
+                    <td class="text-end">
+                        <input type="number" class="valor-editable-inline"
+                               id="val-inp-${v.id_valor}"
+                               value="${v.valor}" min="0" step="100">
+                    </td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-primary btn-xs py-0 px-2"
+                                onclick="actualizarValorExistente(${v.id_valor}, ${idModelo}, '${v.tipo_valor}', ${v.anio || 'null'})"
+                                title="Guardar cambio">✓</button>
+                        <button class="btn btn-sm btn-outline-danger btn-xs py-0 px-2 ms-1"
+                                onclick="eliminarValor(${v.id_valor})"
+                                title="Eliminar">✕</button>
+                    </td>
+                </tr>`;
+        });
+        $('#tabla_valores_wrap').html(`
+            <table class="tabla-valores">
+                <thead>
+                    <tr>
+                        <th>Tipo</th><th>Año</th>
+                        <th class="text-end">Valor (USD)</th><th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>${filas}</tbody>
+            </table>
+        `);
+    }).fail(() => {
+        $('#tabla_valores_wrap').html('<p class="text-danger small">Error al cargar valores.</p>');
+    });
+}
+
+// Actualizar un valor existente inline
+function actualizarValorExistente(idValor, idModelo, tipoValor, anio) {
+    const nuevoValor = parseFloat($(`#val-inp-${idValor}`).val());
+    if (!nuevoValor || nuevoValor <= 0) {
+        alert('Ingresa un valor válido mayor a 0.');
+        return;
+    }
+    const payload = {
+        vrn:        tipoValor === 'VRN' ? nuevoValor : null,
+        historicos: tipoValor === 'HISTORICO' ? [{ anio, valor: nuevoValor }] : [],
+    };
+    $.ajax({
+        url:         `/api/valores_modelo/${idModelo}/guardar`,
+        method:      'POST',
+        contentType: 'application/json',
+        data:        JSON.stringify(payload),
+        success: function(r) {
+            if (r.ok) {
+                mostrarFeedback('✅ Valor actualizado correctamente.', 'success');
+                cargarValoresExistentes(idModelo);
+            } else {
+                mostrarFeedback('❌ Error: ' + r.error, 'danger');
+            }
+        }
+    });
+}
+
+// Eliminar valor
+function eliminarValor(idValor) {
+    Swal.fire({
+        title: '¿Eliminar este valor?',
+        text: 'Esta acción no se puede deshacer.',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#d33', confirmButtonText: 'Sí, eliminar',
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url:    `/api/valores_modelo/eliminar/${idValor}`,
+            method: 'POST',
+            success: function(res) {
+                if (res.ok) {
+                    $(`#val-row-${idValor}`).fadeOut(200, function() {
+                        $(this).remove();
+                        mostrarFeedback('✅ Valor eliminado.', 'success');
+                    });
+                } else {
+                    mostrarFeedback('❌ Error: ' + res.error, 'danger');
+                }
+            }
+        });
+    });
+}
+
+// Agregar fila histórico nueva
+function agregarFilaHistorico() {
+    const idx = Date.now();
+    const fila = $(`
+        <div class="historico-row" id="hist-fila-${idx}">
+            <div>
+                <label>Año</label>
+                <input type="number" class="form-control form-control-sm"
+                       placeholder="${AÑO_ACTUAL - 1}"
+                       min="2000" max="${AÑO_ACTUAL}"
+                       id="hist-anio-${idx}">
+            </div>
+            <div>
+                <label>Valor (USD)</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">$</span>
+                    <input type="number" class="form-control"
+                           placeholder="Ej: 18500" min="0" step="100"
+                           id="hist-valor-${idx}">
+                </div>
+            </div>
+            <button type="button" class="btn-remove-hist"
+                    onclick="$('#hist-fila-${idx}').remove()" title="Eliminar fila">×</button>
+        </div>
+    `);
+    $('#lista_historicos').append(fila);
+    $(`#hist-anio-${idx}`).focus();
+}
+
+// Guardar todos los valores nuevos
+function guardarValores() {
+    const vrn = parseFloat($('#inp_vrn').val()) || null;
+
+    const historicos = [];
+    $('#lista_historicos .historico-row').each(function() {
+        const id    = $(this).attr('id').replace('hist-fila-', '');
+        const anio  = parseInt($(`#hist-anio-${id}`).val());
+        const valor = parseFloat($(`#hist-valor-${id}`).val());
+        if (anio && valor && valor > 0) {
+            historicos.push({ anio, valor });
+        }
+    });
+
+    if (!vrn && !historicos.length) {
+        mostrarFeedback('Ingresa al menos un valor (VRN o histórico).', 'warning');
+        return;
+    }
+
+    $.ajax({
+        url:         `/api/valores_modelo/${idModeloValores}/guardar`,
+        method:      'POST',
+        contentType: 'application/json',
+        data:        JSON.stringify({ vrn, historicos }),
+        success: function(r) {
+            if (r.ok) {
+                mostrarFeedback(
+                    `✅ ${r.insertados} valor(es) insertado(s), ${r.actualizados} actualizado(s).`,
+                    'success'
+                );
+                $('#inp_vrn').val('');
+                $('#lista_historicos').empty();
+                cargarValoresExistentes(idModeloValores);
+            } else {
+                mostrarFeedback('❌ Error: ' + r.error, 'danger');
+            }
+        },
+        error: () => mostrarFeedback('❌ Error de conexión.', 'danger')
+    });
+}
+
+function mostrarFeedback(msg, tipo) {
+    $('#val_feedback')
+        .removeClass('alert-success alert-danger alert-warning')
+        .addClass(`alert alert-${tipo}`)
+        .text(msg)
+        .show();
+    setTimeout(() => $('#val_feedback').fadeOut(), 3000);
+}
+
+// Limpiar modal al cerrar
+$('#modalValores').on('hidden.bs.modal', function() {
+    idModeloValores = null;
+    window.location.reload();
+});
+
+
+// ==============================================================================
+// REGLAS PENDIENTES
+// ==============================================================================
 let reglasPendRestantes = [];
 let idModeloGlobal      = null;
 
@@ -302,7 +717,6 @@ function renderReglasPendientes(idMarca) {
     lista.empty();
     if (!reglasPendRestantes.length) {
         lista.html('<div class="alert alert-success">✅ Todas las reglas procesadas.</div>');
-        // Ahora verificar si hay excepciones pendientes para el modelo
         if (idModeloGlobal) _verificarExcepcionesTrasReglas(idMarca, idModeloGlobal);
         return;
     }
@@ -348,13 +762,13 @@ function resolverReglaPendiente(idx, idPendiente, idMarca, confirmar) {
 }
 
 function _verificarExcepcionesTrasReglas(idMarca, idModelo) {
-    // Recargar la página tras procesar reglas — el modelo ya fue creado
-    // Las excepciones pendientes se verifican en el servidor al agregar el modelo
-    // Como el modelo ya se creó antes, recargamos para mostrar resultado
     window.location.reload();
 }
 
-// ── EXCEPCIONES PENDIENTES ────────────────────────────────────────────────────
+
+// ==============================================================================
+// EXCEPCIONES PENDIENTES
+// ==============================================================================
 let excPendRestantes = [];
 
 function mostrarExcepcionesPendientes(pendientes, idModelo) {
