@@ -62,49 +62,91 @@ def api_excepciones_por_regla(id_regla):
 
 
 # ==============================================================================
-# AGREGAR REGLA
+# AGREGAR REGLA — ahora acepta múltiples marcas a la vez
 # ==============================================================================
 
 @bp.route('/clasificador_riesgos/agregar_regla', methods=['POST'])
 def agregar_regla():
     cur = get_cursor()
     try:
-        id_empresa          = request.form['id_empresa']
-        id_tipo_riesgo      = request.form['id_tipo_riesgo']
-        id_marca_form       = request.form.get('id_marca') or None
-        nombre_marca_nueva  = request.form.get('nombre_marca_nueva', '').strip()
-        id_modelo_form      = request.form.get('id_modelo') or None
-        nombre_modelo_nuevo = request.form.get('nombre_modelo_nuevo', '').strip()
-        anio_inicio = request.form.get('anio_inicio') or None
-        anio_fin    = request.form.get('anio_fin') or None
-        suma_min    = request.form.get('suma_min') or None
-        suma_max    = request.form.get('suma_max') or None
-        nota_regla  = request.form.get('nota_regla') or None
+        id_empresa     = request.form['id_empresa']
+        id_tipo_riesgo = request.form['id_tipo_riesgo']
+        anio_inicio    = request.form.get('anio_inicio') or None
+        anio_fin       = request.form.get('anio_fin') or None
+        suma_min       = request.form.get('suma_min') or None
+        suma_max       = request.form.get('suma_max') or None
+        nota_regla     = request.form.get('nota_regla') or None
 
-        if nombre_marca_nueva:
-            marca_row = vehiculo_model.get_marca_by_nombre(cur, nombre_marca_nueva)
-            if marca_row:
-                _crear_regla_confirmada(cur, id_empresa, id_tipo_riesgo, marca_row[0],
-                                        id_modelo_form, nombre_modelo_nuevo,
-                                        anio_inicio, anio_fin, suma_min, suma_max, nota_regla)
-                flash('Regla guardada (la marca ya existía en BD).', 'success')
-            else:
-                clasificacion_model.insert_regla_pendiente(
-                    cur, id_empresa, id_tipo_riesgo, nombre_marca_nueva,
-                    nombre_modelo_nuevo or None,
-                    anio_inicio, anio_fin, suma_min, suma_max, nota_regla
-                )
-                commit()
-                flash(f'Marca "{nombre_marca_nueva}" no existe. Regla guardada como pendiente.', 'warning')
-                return redirect(url_for('clasificador.clasificador_riesgos'))
+        # ── Recoger listas de marcas, modelos y marcas nuevas ─────────────
+        # Cada fila del formulario envía:
+        #   tipo_marca[]         → 'existente' | 'nueva'
+        #   id_marca[]           → id si existente, vacío si nueva
+        #   nombre_marca_nueva[] → nombre si nueva, vacío si existente
+        #   id_modelo[]          → id modelo específico (puede ser vacío = toda la marca)
+        #   nombre_modelo_nuevo[]→ nombre modelo escrito manualmente
 
-        elif id_marca_form:
-            _crear_regla_confirmada(cur, id_empresa, id_tipo_riesgo, id_marca_form,
-                                    id_modelo_form, nombre_modelo_nuevo,
-                                    anio_inicio, anio_fin, suma_min, suma_max, nota_regla)
-            flash('Regla guardada correctamente.', 'success')
-        else:
-            flash('Debes seleccionar una marca o escribir una nueva.', 'danger')
+        tipos_marca         = request.form.getlist('tipo_marca[]')
+        ids_marca           = request.form.getlist('id_marca[]')
+        nombres_marca_nueva = request.form.getlist('nombre_marca_nueva[]')
+        ids_modelo          = request.form.getlist('id_modelo[]')
+        nombres_modelo_nuevo= request.form.getlist('nombre_modelo_nuevo[]')
+
+        if not tipos_marca:
+            flash('Debes agregar al menos una marca.', 'danger')
+            return redirect(url_for('clasificador.clasificador_riesgos'))
+
+        reglas_ok       = 0
+        reglas_pend     = 0
+        errores         = []
+
+        for i, tipo_marca in enumerate(tipos_marca):
+            id_marca_fila        = ids_marca[i] if i < len(ids_marca) else ''
+            nombre_marca_nueva_f = nombres_marca_nueva[i].strip() if i < len(nombres_marca_nueva) else ''
+            id_modelo_fila       = ids_modelo[i] if i < len(ids_modelo) else ''
+            nombre_modelo_nuevo_f= nombres_modelo_nuevo[i].strip() if i < len(nombres_modelo_nuevo) else ''
+
+            try:
+                if tipo_marca == 'nueva' and nombre_marca_nueva_f:
+                    # Verificar si la marca ya existe
+                    marca_row = vehiculo_model.get_marca_by_nombre(cur, nombre_marca_nueva_f)
+                    if marca_row:
+                        # La marca ya existe, crear regla confirmada
+                        _crear_regla_confirmada(
+                            cur, id_empresa, id_tipo_riesgo, marca_row[0],
+                            id_modelo_fila or None, nombre_modelo_nuevo_f,
+                            anio_inicio, anio_fin, suma_min, suma_max, nota_regla
+                        )
+                        reglas_ok += 1
+                    else:
+                        # La marca no existe, crear regla pendiente
+                        clasificacion_model.insert_regla_pendiente(
+                            cur, id_empresa, id_tipo_riesgo, nombre_marca_nueva_f,
+                            nombre_modelo_nuevo_f or None,
+                            anio_inicio, anio_fin, suma_min, suma_max, nota_regla
+                        )
+                        commit()
+                        reglas_pend += 1
+
+                elif tipo_marca == 'existente' and id_marca_fila:
+                    _crear_regla_confirmada(
+                        cur, id_empresa, id_tipo_riesgo, id_marca_fila,
+                        id_modelo_fila or None, nombre_modelo_nuevo_f,
+                        anio_inicio, anio_fin, suma_min, suma_max, nota_regla
+                    )
+                    reglas_ok += 1
+                else:
+                    errores.append(f'Fila {i+1}: datos incompletos, se ignoró.')
+
+            except Exception as e:
+                errores.append(f'Fila {i+1}: {str(e)}')
+
+        # ── Mensajes de resultado ─────────────────────────────────────────
+        if reglas_ok > 0:
+            flash(f'{reglas_ok} regla(s) guardada(s) correctamente.', 'success')
+        if reglas_pend > 0:
+            flash(f'{reglas_pend} regla(s) guardada(s) como pendiente (marca no existe en BD).', 'warning')
+        for err in errores:
+            flash(err, 'danger')
 
     except Exception as e:
         flash(f'Error al guardar: {e}', 'danger')
@@ -139,7 +181,7 @@ def _crear_regla_confirmada(cur, id_empresa, id_tipo_riesgo, id_marca,
 
 
 # ==============================================================================
-# AGREGAR EXCEPCIÓN — ahora acepta múltiples patrones a la vez
+# AGREGAR EXCEPCIÓN — acepta múltiples patrones a la vez
 # ==============================================================================
 
 @bp.route('/clasificador_riesgos/agregar_excepcion', methods=['POST'])
@@ -153,9 +195,7 @@ def agregar_excepcion():
         if id_tipo_alt == '0':
             id_tipo_alt = None
 
-        # Recoger todos los patrones enviados (campos texto_modelo[], puede ser uno o varios)
         textos_raw = request.form.getlist('texto_modelo[]')
-        # Limpiar y filtrar vacíos
         textos = [t.strip() for t in textos_raw if t.strip()]
 
         if not textos:
@@ -167,11 +207,10 @@ def agregar_excepcion():
             flash('Regla no encontrada.', 'danger')
             return redirect(url_for('clasificador.clasificador_riesgos'))
 
-        total_inserted = 0
+        total_inserted   = 0
         total_pendientes = 0
 
         for texto in textos:
-            # Aplicar a modelos existentes que coincidan con el patrón
             ids_modelos = clasificacion_model.get_modelos_existentes_para_excepcion(
                 cur, id_marca, texto
             )
@@ -184,7 +223,6 @@ def agregar_excepcion():
                 except Exception:
                     pass
 
-            # Guardar patrón pendiente para modelos futuros (si no existe ya)
             if clasificacion_model.count_excepcion_pendiente_existente(cur, id_regla, texto) == 0:
                 clasificacion_model.insert_excepcion_pendiente(
                     cur, id_regla, texto, tipo_exc, id_tipo_alt, nota_exc
