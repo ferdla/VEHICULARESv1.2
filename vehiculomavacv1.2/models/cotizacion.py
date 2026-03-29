@@ -6,10 +6,6 @@ import datetime
 
 
 def get_cotizacion_completa(cur, id_cotizacion):
-    """
-    Devuelve la cabecera de una cotización con datos del vehículo.
-    Retorna None si no existe.
-    """
     cur.execute("""
         SELECT cg.id_cotizacion_guardada,
                cg.numero_cotizacion, cg.fecha_cotizacion,
@@ -25,9 +21,6 @@ def get_cotizacion_completa(cur, id_cotizacion):
 
 
 def get_detalles_cotizacion(cur, id_cotizacion):
-    """
-    Devuelve las filas de cotizacion_detalle para una cotización.
-    """
     cur.execute("""
         SELECT e.id_empresa, e.nombre_empresa,
                cd.tipo_riesgo, cd.tasa, cd.prima_anual,
@@ -41,10 +34,6 @@ def get_detalles_cotizacion(cur, id_cotizacion):
 
 
 def generar_numero_cotizacion(cur):
-    """
-    Genera el próximo número de cotización en formato COT-{AÑO}-{N:06d}-VEH.
-    El contador reinicia cada año.
-    """
     anio = datetime.date.today().year
     cur.execute(
         "SELECT COUNT(*) FROM cotizacion_guardada WHERE YEAR(fecha_cotizacion) = %s",
@@ -55,15 +44,20 @@ def generar_numero_cotizacion(cur):
 
 
 def insert_cotizacion(cur, numero, nombre_cliente, dni_ruc, placa, email,
-                      id_modelo, anio_fabricacion, suma_asegurada):
+                      id_modelo, anio_fabricacion, suma_asegurada, id_usuario=None):
+    """
+    Inserta una cotización guardada.
+    id_usuario: ID del usuario que generó la cotización (puede ser None para
+                cotizaciones antiguas o si no hay sesión activa).
+    """
     cur.execute("""
         INSERT INTO cotizacion_guardada
             (numero_cotizacion, fecha_cotizacion,
              nombre_cliente, dni_ruc, placa, email,
-             id_modelo, anio_fabricacion, suma_asegurada)
-        VALUES (%s, CURDATE(), %s, %s, %s, %s, %s, %s, %s)
+             id_modelo, anio_fabricacion, suma_asegurada, id_usuario)
+        VALUES (%s, CURDATE(), %s, %s, %s, %s, %s, %s, %s, %s)
     """, (numero, nombre_cliente, dni_ruc, placa, email,
-          id_modelo, anio_fabricacion, suma_asegurada))
+          id_modelo, anio_fabricacion, suma_asegurada, id_usuario))
 
 
 def insert_detalle_cotizacion(cur, id_cotizacion, id_empresa,
