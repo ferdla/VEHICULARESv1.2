@@ -138,6 +138,32 @@ def get_valor_by_anio_tipo(cur, id_modelo, anio, tipo_valor):
     return cur.fetchone()
 
 
+def get_todos_valores_modelo(cur, id_modelo):
+    """
+    Devuelve todos los valores registrados para un modelo:
+    primero el VRN, luego los históricos ordenados por año DESC.
+    Retorna lista de dicts con: id_valor, tipo_valor, anio, valor
+    """
+    cur.execute("""
+        SELECT id_valor, tipo_valor, anio, valor
+        FROM valor_vehiculo
+        WHERE id_modelo = %s
+        ORDER BY
+            CASE tipo_valor WHEN 'VRN' THEN 0 ELSE 1 END,
+            anio DESC
+    """, (id_modelo,))
+    rows = cur.fetchall()
+    return [
+        {
+            'id_valor':   r[0],
+            'tipo_valor': r[1],
+            'anio':       r[2],
+            'valor':      float(r[3]),
+        }
+        for r in rows
+    ]
+
+
 def insert_valor_vehiculo(cur, id_modelo, anio, valor, tipo_valor):
     if anio is None:
         cur.execute(
@@ -153,3 +179,22 @@ def insert_valor_vehiculo(cur, id_modelo, anio, valor, tipo_valor):
 
 def update_valor_vehiculo(cur, id_valor, valor):
     cur.execute("UPDATE valor_vehiculo SET valor=%s WHERE id_valor=%s", (valor, id_valor))
+
+
+def delete_valor_vehiculo(cur, id_valor):
+    cur.execute("DELETE FROM valor_vehiculo WHERE id_valor=%s", (id_valor,))
+
+
+def upsert_valor_vehiculo(cur, id_modelo, anio, valor, tipo_valor):
+    """
+    Inserta o actualiza un valor vehicular.
+    Si ya existe un registro para (id_modelo, anio, tipo_valor), lo actualiza.
+    Retorna 'inserted' o 'updated'.
+    """
+    existente = get_valor_by_anio_tipo(cur, id_modelo, anio, tipo_valor)
+    if existente:
+        update_valor_vehiculo(cur, existente[0], valor)
+        return 'updated'
+    else:
+        insert_valor_vehiculo(cur, id_modelo, anio, valor, tipo_valor)
+        return 'inserted'
