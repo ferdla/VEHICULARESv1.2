@@ -3,7 +3,6 @@
 
 {% block extra_head %}
 <style>
-/* ── Filtros ──────────────────────────────────────────────────────────────── */
 .filtros-card {
     background: #fff;
     border-radius: 12px;
@@ -11,8 +10,6 @@
     padding: 20px 24px;
     margin-bottom: 24px;
 }
-
-/* ── Tabla ────────────────────────────────────────────────────────────────── */
 .hist-table {
     width: 100%;
     border-collapse: separate;
@@ -37,39 +34,31 @@
 }
 .hist-table tbody tr:last-child td { border-bottom: none; }
 .hist-table tbody tr:hover td     { background: #f8f9ff; }
-
-/* ── Badges ───────────────────────────────────────────────────────────────── */
 .badge-editado {
     display: inline-block;
     background: #fff3cd; color: #856404;
     font-size: .72rem; padding: 2px 7px;
     border-radius: 4px; margin-left: 4px;
 }
-.prima-valor {
-    font-weight: 700;
-    color: #1a7a3f;
-    white-space: nowrap;
+.prima-valor { font-weight: 700; color: #1a7a3f; white-space: nowrap; }
+.prima-na    { color: #aaa; font-style: italic; font-size: .85rem; }
+.num-cot     { font-family: monospace; font-size: .85rem; color: #00489a; font-weight: 600; }
+.badge-usuario {
+    background: #e8f0fe; color: #00489a;
+    font-size: .7rem; padding: 2px 7px;
+    border-radius: 4px; font-weight: 600;
 }
-.prima-na {
-    color: #aaa;
-    font-style: italic;
-    font-size: .85rem;
+.badge-yo {
+    background: #d4edda; color: #155724;
+    font-size: .7rem; padding: 2px 7px;
+    border-radius: 4px; font-weight: 600;
 }
-.num-cot {
-    font-family: monospace;
-    font-size: .85rem;
-    color: #00489a;
-    font-weight: 600;
-}
-
-/* ── Acciones ─────────────────────────────────────────────────────────────── */
 .btn-ver {
     background: #00489a; color: #fff;
     border: none; border-radius: 6px;
     padding: 5px 12px; font-size: .82rem;
     cursor: pointer; text-decoration: none;
-    display: inline-block;
-    transition: background .2s;
+    display: inline-block; transition: background .2s;
 }
 .btn-ver:hover { background: #003278; color: #fff; }
 .btn-eliminar {
@@ -79,14 +68,27 @@
     cursor: pointer; transition: all .2s;
 }
 .btn-eliminar:hover { background: #dc3545; color: #fff; }
-
-/* ── Sin resultados ───────────────────────────────────────────────────────── */
-.empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #999;
-}
+.empty-state { text-align: center; padding: 60px 20px; color: #999; }
 .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+/* Tabs de vista */
+.vista-tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+.vista-tab {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: .88rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: 2px solid #dee2e6;
+    color: #555;
+    transition: all .2s;
+    background: #fff;
+}
+.vista-tab:hover { border-color: #00489a; color: #00489a; }
+.vista-tab.active {
+    background: #00489a; color: #fff;
+    border-color: #00489a;
+}
 </style>
 {% endblock %}
 
@@ -100,6 +102,18 @@
         </div>
         <a href="{{ url_for('cotizador.cotizador') }}" class="btn btn-primary">
             + Nueva cotización
+        </a>
+    </div>
+
+    <!-- ── TABS de vista ── -->
+    <div class="vista-tabs">
+        <a href="{{ url_for('historial.mis_cotizaciones') }}"
+           class="vista-tab {{ 'active' if vista == 'mis' else '' }}">
+            👤 Mis cotizaciones
+        </a>
+        <a href="{{ url_for('historial.historial') }}"
+           class="vista-tab {{ 'active' if vista == 'todas' else '' }}">
+            📋 Todas las cotizaciones
         </a>
     </div>
 
@@ -129,13 +143,9 @@
                        name="fecha_hasta" value="{{ filtros.fecha_hasta }}">
             </div>
             <div class="col-md-3 d-flex gap-2">
-                <button type="submit" class="btn btn-primary btn-sm flex-fill">
-                    🔍 Buscar
-                </button>
-                <a href="{{ url_for('historial.historial') }}"
-                   class="btn btn-outline-secondary btn-sm flex-fill">
-                    Limpiar
-                </a>
+                <button type="submit" class="btn btn-primary btn-sm flex-fill">🔍 Buscar</button>
+                <a href="{{ url_for('historial.mis_cotizaciones' if vista == 'mis' else 'historial.historial') }}"
+                   class="btn btn-outline-secondary btn-sm flex-fill">Limpiar</a>
             </div>
         </form>
     </div>
@@ -153,6 +163,7 @@
                         <th>Vehículo</th>
                         <th>Suma asegurada</th>
                         <th>Prima mínima</th>
+                        {% if vista == 'todas' %}<th>Generado por</th>{% endif %}
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -171,55 +182,54 @@
                         c[9]  suma_asegurada
                         c[10] editado_manualmente
                         c[11] prima_minima
+                        c[12] id_usuario
+                        c[13] username
                     #}
                     <tr id="fila_{{ c[0] }}">
                         <td>
                             <span class="num-cot">{{ c[1] }}</span>
-                            {% if c[10] %}
-                                <span class="badge-editado">editado</span>
-                            {% endif %}
+                            {% if c[10] %}<span class="badge-editado">editado</span>{% endif %}
                         </td>
                         <td style="white-space:nowrap;">
                             {{ c[2].strftime('%d/%m/%Y') if c[2] else '-' }}
                         </td>
                         <td>
-                            <div class="fw-semibold" style="font-size:.9rem;">
-                                {{ c[3] or '—' }}
-                            </div>
-                            {% if c[4] %}
-                                <small class="text-muted">{{ c[4] }}</small>
-                            {% endif %}
-                            {% if c[5] %}
-                                <small class="text-muted d-block">🚗 {{ c[5] }}</small>
-                            {% endif %}
+                            <div class="fw-semibold" style="font-size:.9rem;">{{ c[3] or '—' }}</div>
+                            {% if c[4] %}<small class="text-muted">{{ c[4] }}</small>{% endif %}
+                            {% if c[5] %}<small class="text-muted d-block">🚗 {{ c[5] }}</small>{% endif %}
                         </td>
                         <td>
-                            <div class="fw-semibold" style="font-size:.9rem;">
-                                {{ c[6] }} {{ c[7] }}
-                            </div>
+                            <div class="fw-semibold" style="font-size:.9rem;">{{ c[6] }} {{ c[7] }}</div>
                             <small class="text-muted">{{ c[8] }}</small>
                         </td>
-                        <td style="white-space:nowrap;">
-                            US$ {{ "%.2f"|format(c[9]) }}
-                        </td>
+                        <td style="white-space:nowrap;">US$ {{ "%.2f"|format(c[9]) }}</td>
                         <td>
                             {% if c[11] %}
-                                <span class="prima-valor">
-                                    US$ {{ "%.2f"|format(c[11]) }}
-                                </span>
+                                <span class="prima-valor">US$ {{ "%.2f"|format(c[11]) }}</span>
                             {% else %}
                                 <span class="prima-na">No asegurable</span>
                             {% endif %}
                         </td>
+                        {% if vista == 'todas' %}
+                        <td>
+                            {% if c[13] %}
+                                {% if c[12] == session_id %}
+                                    <span class="badge-yo">👤 {{ c[13] }} (tú)</span>
+                                {% else %}
+                                    <span class="badge-usuario">{{ c[13] }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         <td style="white-space:nowrap;">
                             <a href="{{ url_for('documento.ver_documento', id_cotizacion=c[0]) }}"
-                               class="btn-ver">
-                                📄 Ver
-                            </a>
+                               class="btn-ver">📄 Ver</a>
+                            {% if session_rol == 'admin' %}
                             <button class="btn-eliminar ms-1"
-                                    onclick="confirmarEliminar({{ c[0] }}, '{{ c[1] }}')">
-                                🗑
-                            </button>
+                                    onclick="confirmarEliminar({{ c[0] }}, '{{ c[1] }}')">🗑</button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -227,41 +237,30 @@
             </table>
         </div>
 
-        <!-- ── PAGINACIÓN ── -->
+        <!-- PAGINACIÓN -->
         {% if pages > 1 %}
         <div class="px-4 py-3 border-top">
             <nav>
                 <ul class="pagination justify-content-center mb-0">
+                    {% set base_url = url_for('historial.mis_cotizaciones' if vista == 'mis' else 'historial.historial') %}
                     {% if page > 1 %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('historial.historial', page=1, **filtros) }}">« Primera</a>
+                        <a class="page-link" href="{{ base_url }}?page=1&{{ filtros|urlencode }}">« Primera</a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('historial.historial', page=page-1, **filtros) }}">‹ Anterior</a>
+                        <a class="page-link" href="{{ base_url }}?page={{ page-1 }}&{{ filtros|urlencode }}">‹ Anterior</a>
                     </li>
                     {% endif %}
-
                     {% set rango_inicio = [1, page-3]|max %}
                     {% set rango_fin    = [pages, page+3]|min %}
-                    {% if rango_inicio > 1 %}
-                        <li class="page-item disabled"><span class="page-link">...</span></li>
-                    {% endif %}
                     {% for p in range(rango_inicio, rango_fin+1) %}
                     <li class="page-item {{ 'active' if p==page else '' }}">
-                        <a class="page-link"
-                           href="{{ url_for('historial.historial', page=p, **filtros) }}">{{ p }}</a>
+                        <a class="page-link" href="{{ base_url }}?page={{ p }}&{{ filtros|urlencode }}">{{ p }}</a>
                     </li>
                     {% endfor %}
-                    {% if rango_fin < pages %}
-                        <li class="page-item disabled"><span class="page-link">...</span></li>
-                    {% endif %}
-
                     {% if page < pages %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('historial.historial', page=page+1, **filtros) }}">Siguiente ›</a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="{{ url_for('historial.historial', page=pages, **filtros) }}">Última »</a>
+                        <a class="page-link" href="{{ base_url }}?page={{ page+1 }}&{{ filtros|urlencode }}">Siguiente ›</a>
                     </li>
                     {% endif %}
                 </ul>
@@ -277,11 +276,13 @@
             <div class="icon">📋</div>
             {% if filtros.cliente or filtros.placa or filtros.fecha_desde or filtros.fecha_hasta %}
                 <p class="fw-semibold">No se encontraron cotizaciones con esos filtros.</p>
-                <a href="{{ url_for('historial.historial') }}" class="btn btn-outline-primary btn-sm">
-                    Limpiar filtros
-                </a>
+                <a href="{{ url_for('historial.mis_cotizaciones' if vista == 'mis' else 'historial.historial') }}"
+                   class="btn btn-outline-primary btn-sm">Limpiar filtros</a>
             {% else %}
-                <p class="fw-semibold">Aún no hay cotizaciones guardadas.</p>
+                <p class="fw-semibold">
+                    {% if vista == 'mis' %}Aún no has generado cotizaciones.
+                    {% else %}No hay cotizaciones guardadas.{% endif %}
+                </p>
                 <a href="{{ url_for('cotizador.cotizador') }}" class="btn btn-primary btn-sm">
                     Crear primera cotización
                 </a>
@@ -292,7 +293,6 @@
 
 </div>
 {% endblock %}
-
 
 {% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -310,7 +310,6 @@ function confirmarEliminar(id, numero) {
         cancelButtonText: 'Cancelar',
     }).then(result => {
         if (!result.isConfirmed) return;
-
         $.ajax({
             url: `/historial/eliminar/${id}`,
             method: 'POST',
@@ -318,9 +317,7 @@ function confirmarEliminar(id, numero) {
                 if (r.ok) {
                     $(`#fila_${id}`).fadeOut(300, function() {
                         $(this).remove();
-                        // Actualizar contador
-                        const filas = $('.hist-table tbody tr').length;
-                        if (filas === 0) location.reload();
+                        if ($('.hist-table tbody tr').length === 0) location.reload();
                     });
                 } else {
                     Swal.fire('Error', r.error, 'error');
