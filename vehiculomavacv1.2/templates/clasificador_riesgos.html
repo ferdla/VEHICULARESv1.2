@@ -3,6 +3,102 @@
 
 {% block extra_head %}
 <style>
+/* ── Filas de marca ──────────────────────────────────────────────────────── */
+.marca-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 10px;
+    align-items: start;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #f8faff;
+    transition: border-color .2s;
+}
+.marca-row:hover {
+    border-color: #b8d0f8;
+}
+.marca-row .marca-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.marca-row .marca-col label {
+    font-size: .78rem;
+    font-weight: 600;
+    color: #555;
+    margin: 0;
+}
+.btn-remove-marca {
+    border: none;
+    background: transparent;
+    color: #dc3545;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: all .15s;
+    margin-top: 20px;
+}
+.btn-remove-marca:hover {
+    background: #fff0f0;
+    color: #a71d2a;
+}
+.btn-add-marca {
+    font-size: .85rem;
+    border: 1px dashed #00489a;
+    color: #00489a;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .2s;
+    width: 100%;
+    margin-top: 4px;
+}
+.btn-add-marca:hover {
+    background: #e8f0fe;
+}
+
+/* ── Separador de parámetros compartidos ─────────────────────────────────── */
+.params-section {
+    background: #f0f5ff;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid #d0e0ff;
+}
+.params-section .section-label {
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #00489a;
+    margin-bottom: 12px;
+}
+.marcas-section .section-label {
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #444;
+    margin-bottom: 10px;
+}
+
+/* ── Badge nueva marca ───────────────────────────────────────────────────── */
+.badge-nueva-marca {
+    display: inline-block;
+    background: #fff3cd;
+    color: #856404;
+    font-size: .7rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+/* ── Patron rows (excepciones) ───────────────────────────────────────────── */
 .patron-row        { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
 .patron-row input  { flex:1; }
 .btn-remove-patron { border:none; background:transparent; color:#dc3545;
@@ -144,96 +240,112 @@
 
     <!-- ===== MODAL NUEVA REGLA ===== -->
     <div class="modal fade" id="modalNuevaRegla" tabindex="-1">
-        <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-dialog modal-xl"><div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Nueva Regla de Clasificación</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form action="{{ url_for('clasificador.agregar_regla') }}" method="POST">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Empresa</label>
-                            <select class="form-select" name="id_empresa" id="modal_empresa" required>
-                                {% for e in empresas %}
-                                <option value="{{ e[0] }}">{{ e[1] }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Tipo de Riesgo</label>
-                            <select class="form-select" name="id_tipo_riesgo" id="modal_tipo" required>
-                                <option value="">-- Seleccione empresa primero --</option>
-                            </select>
-                        </div>
 
-                        <div class="col-12">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="chkMarcaNueva">
-                                <label class="form-check-label">La marca aún no existe en BD</label>
+                    <!-- ── PARÁMETROS COMPARTIDOS ── -->
+                    <div class="params-section">
+                        <div class="section-label">📋 Parámetros compartidos para todas las marcas</div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Empresa</label>
+                                <select class="form-select" name="id_empresa" id="modal_empresa" required>
+                                    {% for e in empresas %}
+                                    <option value="{{ e[0] }}">{{ e[1] }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
-                        </div>
-                        <div id="divMarcaExistente" class="col-md-6">
-                            <label class="form-label">Marca existente</label>
-                            <select class="form-select" name="id_marca" id="modal_marca">
-                                {% for m in marcas %}
-                                <option value="{{ m[0] }}">{{ m[1] }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div id="divMarcaNueva" class="col-md-6" style="display:none;">
-                            <label class="form-label">Nombre de la nueva marca</label>
-                            <input type="text" class="form-control" name="nombre_marca_nueva"
-                                   placeholder="Ej: Ferrari">
-                            <small class="text-muted">La regla quedará pendiente hasta que se agregue esta marca.</small>
-                        </div>
-
-                        <div class="col-12">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="chkModeloNuevo">
-                                <label class="form-check-label">Especificar modelo (dejar sin marcar = toda la marca)</label>
+                            <div class="col-md-6">
+                                <label class="form-label">Tipo de Riesgo</label>
+                                <select class="form-select" name="id_tipo_riesgo" id="modal_tipo" required>
+                                    <option value="">-- Seleccione empresa primero --</option>
+                                </select>
                             </div>
-                        </div>
-                        <div id="divModeloOpciones" style="display:none;" class="col-12">
-                            <div class="row g-2">
-                                <div class="col-md-6">
-                                    <label class="form-label">Modelo existente</label>
-                                    <select class="form-select" name="id_modelo" id="modal_modelo">
-                                        <option value="">-- Toda la marca --</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">O escribir modelo nuevo</label>
-                                    <input type="text" class="form-control" name="nombre_modelo_nuevo"
-                                           placeholder="Ej: 488 Spider">
-                                    <small class="text-muted">Si no existe, se guardará como excepción pendiente.</small>
-                                </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Año inicio</label>
+                                <input type="number" class="form-control" name="anio_inicio" placeholder="Ej: 2005">
                             </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Año inicio (opcional)</label>
-                            <input type="number" class="form-control" name="anio_inicio" placeholder="Ej: 2005">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Año fin (opcional)</label>
-                            <input type="number" class="form-control" name="anio_fin" placeholder="Ej: 2025">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Suma mínima (opcional)</label>
-                            <input type="number" step="0.01" class="form-control" name="suma_min">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Suma máxima (opcional)</label>
-                            <input type="number" step="0.01" class="form-control" name="suma_max">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Nota / Descripción</label>
-                            <textarea class="form-control" name="nota_regla" rows="2"></textarea>
+                            <div class="col-md-3">
+                                <label class="form-label">Año fin</label>
+                                <input type="number" class="form-control" name="anio_fin" placeholder="Ej: 2025">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Suma mínima</label>
+                                <input type="number" step="0.01" class="form-control" name="suma_min">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Suma máxima</label>
+                                <input type="number" step="0.01" class="form-control" name="suma_max">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Nota / Descripción</label>
+                                <textarea class="form-control" name="nota_regla" rows="2"
+                                          placeholder="Ej: Aplica a todos los modelos de la marca"></textarea>
+                            </div>
                         </div>
                     </div>
-                    <div class="mt-4">
-                        <button type="submit" class="btn btn-primary">Guardar Regla</button>
+
+                    <!-- ── FILAS DE MARCAS ── -->
+                    <div class="marcas-section">
+                        <div class="section-label">🚗 Marcas a las que aplica esta regla</div>
+                        <div id="lista_marcas">
+                            <!-- Primera fila (siempre visible) -->
+                            <div class="marca-row" id="marca-row-0">
+                                <div class="marca-col">
+                                    <label>Marca</label>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <select class="form-select select-marca"
+                                                name="id_marca[]"
+                                                onchange="onMarcaChange(this, 0)">
+                                            <option value="">-- Seleccione --</option>
+                                            {% for m in marcas %}
+                                            <option value="{{ m[0] }}">{{ m[1] }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-check form-check-inline ms-1 mb-0" style="white-space:nowrap">
+                                            <input class="form-check-input chk-nueva-marca"
+                                                   type="checkbox" id="chkNueva0"
+                                                   onchange="toggleNuevaMarca(this, 0)">
+                                            <label class="form-check-label" for="chkNueva0"
+                                                   style="font-size:.82rem">Nueva</label>
+                                        </div>
+                                    </div>
+                                    <!-- Input marca nueva (oculto por defecto) -->
+                                    <input type="text" class="form-control input-nueva-marca mt-1"
+                                           name="nombre_marca_nueva[]"
+                                           placeholder="Nombre de marca nueva"
+                                           style="display:none">
+                                    <!-- Campo oculto tipo_marca -->
+                                    <input type="hidden" name="tipo_marca[]" value="existente" class="hidden-tipo-marca">
+                                </div>
+                                <div class="marca-col">
+                                    <label>Modelo <span class="text-muted" style="font-weight:400">(opcional)</span></label>
+                                    <select class="form-select select-modelo-fila" name="id_modelo[]" disabled>
+                                        <option value="">-- Toda la marca --</option>
+                                    </select>
+                                    <input type="text" class="form-control mt-1"
+                                           name="nombre_modelo_nuevo[]"
+                                           placeholder="O escribir modelo nuevo...">
+                                </div>
+                                <!-- Sin botón eliminar en la primera fila -->
+                                <div></div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn-add-marca mt-2" onclick="agregarFilaMarca()">
+                            + Agregar otra marca
+                        </button>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Guardar Regla(s)</button>
+                        <button type="button" class="btn btn-outline-secondary"
+                                data-bs-dismiss="modal">Cancelar</button>
                     </div>
                 </form>
             </div>
@@ -250,12 +362,10 @@
             </div>
             <div class="modal-body">
 
-                <!-- ── FORMULARIO MULTI-EXCEPCIÓN ── -->
                 <form id="formExcepcion"
                       action="{{ url_for('clasificador.agregar_excepcion') }}" method="POST">
                     <input type="hidden" name="id_regla_clasificacion" id="ex_id_regla_hidden">
 
-                    <!-- Acción y riesgo alternativo (compartidos por todos los patrones) -->
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Acción</label>
@@ -272,13 +382,12 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Nota (opcional, aplica a todos)</label>
+                            <label class="form-label">Nota (opcional)</label>
                             <input type="text" class="form-control" name="nota_excepcion"
                                    placeholder="Ej: Modelos con turbo de alta gama">
                         </div>
                     </div>
 
-                    <!-- Lista dinámica de patrones -->
                     <label class="form-label fw-semibold">
                         Modelos / Patrones
                         <small class="text-muted fw-normal ms-1">
@@ -286,7 +395,6 @@
                         </small>
                     </label>
                     <div id="lista_patrones">
-                        <!-- Primera fila siempre visible -->
                         <div class="patron-row">
                             <input type="text" class="form-control" name="texto_modelo[]"
                                    placeholder="Ej: R8, Sentra, Festiva" required>
@@ -299,9 +407,7 @@
                     </button>
 
                     <div class="mt-3">
-                        <button type="submit" class="btn btn-primary">
-                            Guardar excepción(es)
-                        </button>
+                        <button type="submit" class="btn btn-primary">Guardar excepción(es)</button>
                     </div>
                 </form>
 
@@ -323,6 +429,15 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+// ── Datos de marcas para JS ───────────────────────────────────────────────────
+const MARCAS_DATA = [
+    {% for m in marcas %}
+    { id: {{ m[0] }}, nombre: {{ m[1]|tojson }} },
+    {% endfor %}
+];
+
+let contadorFilas = 1; // Para IDs únicos de filas
+
 // ── Filtros ───────────────────────────────────────────────────────────────────
 $('#filtro_empresa').change(function() {
     const id = $(this).val(), sel = $('#filtro_tipo');
@@ -334,7 +449,7 @@ function limpiarFiltros() {
     window.location.href = "{{ url_for('clasificador.clasificador_riesgos') }}";
 }
 
-// ── Modal nueva regla ─────────────────────────────────────────────────────────
+// ── Empresa → cargar tipos de riesgo en modal ─────────────────────────────────
 $('#modal_empresa').change(function() {
     const id = $(this).val(), sel = $('#modal_tipo');
     sel.html('<option value="">-- Seleccione empresa --</option>');
@@ -342,21 +457,146 @@ $('#modal_empresa').change(function() {
         data => data.forEach(t => sel.append($('<option>').val(t.id).text(t.nombre))));
 });
 
-$('#chkMarcaNueva').change(function() {
-    $('#divMarcaExistente').toggle(!this.checked);
-    $('#divMarcaNueva').toggle(this.checked);
-    $('#modal_modelo').html('<option value="">-- Toda la marca --</option>');
+// ── Limpiar modal al abrir ────────────────────────────────────────────────────
+$('#modalNuevaRegla').on('show.bs.modal', function() {
+    // Dejar solo la primera fila de marcas
+    $('#lista_marcas .marca-row:not(#marca-row-0)').remove();
+    // Resetear primera fila
+    resetearFilaMarca(0);
+    contadorFilas = 1;
+    // Resetear tipos de riesgo
+    $('#modal_tipo').html('<option value="">-- Seleccione empresa primero --</option>');
 });
 
-$('#chkModeloNuevo').change(function() {
-    $('#divModeloOpciones').toggle(this.checked);
-});
+// ── Toggle marca nueva/existente ──────────────────────────────────────────────
+function toggleNuevaMarca(chk, idx) {
+    const row      = $(`#marca-row-${idx}`);
+    const esNueva  = chk.checked;
+    row.find('.select-marca').toggle(!esNueva);
+    row.find('.input-nueva-marca').toggle(esNueva);
+    row.find('.hidden-tipo-marca').val(esNueva ? 'nueva' : 'existente');
 
-$('#modal_marca').change(function() {
-    const id = $(this).val(), sel = $('#modal_modelo');
-    sel.html('<option value="">-- Toda la marca --</option>');
-    if (id) $.getJSON(`/api/modelos_por_marca/${id}`,
-        data => data.forEach(m => sel.append($('<option>').val(m.id).text(m.nombre))));
+    if (esNueva) {
+        // Deshabilitar selector de modelo cuando es marca nueva
+        row.find('.select-modelo-fila')
+           .html('<option value="">-- Toda la marca --</option>')
+           .prop('disabled', true);
+    }
+}
+
+// ── Marca change → cargar modelos ─────────────────────────────────────────────
+function onMarcaChange(selectEl, idx) {
+    const id  = $(selectEl).val();
+    const row = $(`#marca-row-${idx}`);
+    const sel = row.find('.select-modelo-fila');
+
+    sel.html('<option value="">-- Toda la marca --</option>').prop('disabled', true);
+
+    if (id) {
+        $.getJSON(`/api/modelos_por_marca/${id}`, function(data) {
+            data.forEach(m => sel.append($('<option>').val(m.id).text(m.nombre)));
+            sel.prop('disabled', false);
+        });
+    }
+}
+
+// ── Agregar fila de marca ──────────────────────────────────────────────────────
+function agregarFilaMarca() {
+    const idx = contadorFilas++;
+    const opciones = MARCAS_DATA.map(m =>
+        `<option value="${m.id}">${m.nombre}</option>`
+    ).join('');
+
+    const fila = $(`
+        <div class="marca-row" id="marca-row-${idx}">
+            <div class="marca-col">
+                <label>Marca</label>
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select select-marca"
+                            name="id_marca[]"
+                            onchange="onMarcaChange(this, ${idx})">
+                        <option value="">-- Seleccione --</option>
+                        ${opciones}
+                    </select>
+                    <div class="form-check form-check-inline ms-1 mb-0" style="white-space:nowrap">
+                        <input class="form-check-input chk-nueva-marca"
+                               type="checkbox" id="chkNueva${idx}"
+                               onchange="toggleNuevaMarca(this, ${idx})">
+                        <label class="form-check-label" for="chkNueva${idx}"
+                               style="font-size:.82rem">Nueva</label>
+                    </div>
+                </div>
+                <input type="text" class="form-control input-nueva-marca mt-1"
+                       name="nombre_marca_nueva[]"
+                       placeholder="Nombre de marca nueva"
+                       style="display:none">
+                <input type="hidden" name="tipo_marca[]" value="existente" class="hidden-tipo-marca">
+            </div>
+            <div class="marca-col">
+                <label>Modelo <span class="text-muted" style="font-weight:400">(opcional)</span></label>
+                <select class="form-select select-modelo-fila" name="id_modelo[]" disabled>
+                    <option value="">-- Toda la marca --</option>
+                </select>
+                <input type="text" class="form-control mt-1"
+                       name="nombre_modelo_nuevo[]"
+                       placeholder="O escribir modelo nuevo...">
+            </div>
+            <button type="button" class="btn-remove-marca"
+                    onclick="quitarFilaMarca(this)" title="Eliminar fila">×</button>
+        </div>
+    `);
+
+    $('#lista_marcas').append(fila);
+    fila.find('.select-marca').focus();
+}
+
+// ── Quitar fila de marca ──────────────────────────────────────────────────────
+function quitarFilaMarca(btn) {
+    const filas = $('#lista_marcas .marca-row');
+    if (filas.length > 1) {
+        $(btn).closest('.marca-row').remove();
+    } else {
+        alert('Debe haber al menos una marca.');
+    }
+}
+
+// ── Resetear primera fila ─────────────────────────────────────────────────────
+function resetearFilaMarca(idx) {
+    const row = $(`#marca-row-${idx}`);
+    row.find('.select-marca').val('');
+    row.find('.input-nueva-marca').hide().val('');
+    row.find('.select-marca').show();
+    row.find('.chk-nueva-marca').prop('checked', false);
+    row.find('.hidden-tipo-marca').val('existente');
+    row.find('.select-modelo-fila')
+       .html('<option value="">-- Toda la marca --</option>')
+       .prop('disabled', true);
+    row.find('input[name="nombre_modelo_nuevo[]"]').val('');
+}
+
+// ── Agregar / quitar filas de patrón (excepciones) ───────────────────────────
+function agregarPatron() {
+    const fila = $(`
+        <div class="patron-row">
+            <input type="text" class="form-control" name="texto_modelo[]"
+                   placeholder="Ej: Civic, Corolla, 3008...">
+            <button type="button" class="btn-remove-patron" onclick="quitarPatron(this)"
+                    title="Eliminar">×</button>
+        </div>
+    `);
+    $('#lista_patrones').append(fila);
+    fila.find('input').focus();
+}
+
+function quitarPatron(btn) {
+    if ($('#lista_patrones .patron-row').length > 1) {
+        $(btn).closest('.patron-row').remove();
+    }
+}
+
+$('#modalExcepciones').on('show.bs.modal', function() {
+    $('#lista_patrones .patron-row:not(:first)').remove();
+    $('#lista_patrones input').first().val('');
 });
 
 // ── SweetAlert eliminar regla ─────────────────────────────────────────────────
@@ -380,33 +620,6 @@ $('.delete-regla-pend').on('submit', function(e) {
         icon: 'warning', showCancelButton: true,
         confirmButtonColor: '#d33', confirmButtonText: 'Sí, eliminar'
     }).then(r => { if (r.isConfirmed) f.submit(); });
-});
-
-// ── Agregar / quitar filas de patrón ─────────────────────────────────────────
-function agregarPatron() {
-    const fila = $(`
-        <div class="patron-row">
-            <input type="text" class="form-control" name="texto_modelo[]"
-                   placeholder="Ej: Civic, Corolla, 3008...">
-            <button type="button" class="btn-remove-patron" onclick="quitarPatron(this)"
-                    title="Eliminar">×</button>
-        </div>
-    `);
-    $('#lista_patrones').append(fila);
-    fila.find('input').focus();
-}
-
-function quitarPatron(btn) {
-    // No eliminar si es la única fila
-    if ($('#lista_patrones .patron-row').length > 1) {
-        $(btn).closest('.patron-row').remove();
-    }
-}
-
-// Al abrir el modal, limpiar las filas extra y dejar solo la primera
-$('#modalExcepciones').on('show.bs.modal', function() {
-    $('#lista_patrones .patron-row:not(:first)').remove();
-    $('#lista_patrones input').first().val('');
 });
 
 // ── Modal excepciones ─────────────────────────────────────────────────────────
