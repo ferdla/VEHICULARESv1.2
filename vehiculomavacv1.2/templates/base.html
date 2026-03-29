@@ -8,6 +8,72 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='img/mavaclogoparte2.png') }}">
+    <style>
+        /* ── Usuario info en sidebar ── */
+        .user-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 15px;
+            border-top: 1px solid rgba(255,255,255,.15);
+            background: rgba(0,0,0,.15);
+        }
+        .user-info .user-name {
+            font-size: .82rem;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .user-info .user-rol {
+            font-size: .7rem;
+            color: rgba(255,255,255,.6);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+        .user-info .btn-logout {
+            display: block;
+            margin-top: 8px;
+            width: 100%;
+            padding: 5px 0;
+            border: 1px solid rgba(255,255,255,.3);
+            border-radius: 6px;
+            background: transparent;
+            color: rgba(255,255,255,.8);
+            font-size: .78rem;
+            text-align: center;
+            text-decoration: none;
+            transition: all .2s;
+            cursor: pointer;
+        }
+        .user-info .btn-logout:hover {
+            background: rgba(255,255,255,.15);
+            color: #fff;
+        }
+        .mini-barra-lateral .user-name,
+        .mini-barra-lateral .user-rol,
+        .mini-barra-lateral .btn-logout { display: none; }
+        .mini-barra-lateral .user-info {
+            padding: 10px;
+            text-align: center;
+        }
+
+        /* Badge admin en menú */
+        .badge-admin {
+            display: inline-block;
+            background: rgba(255,165,0,.25);
+            color: #ffd580;
+            font-size: .6rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-left: 4px;
+            vertical-align: middle;
+            font-weight: 700;
+            letter-spacing: .04em;
+        }
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -20,8 +86,10 @@
                      width="170px" height="60px">
             </span>
         </div>
+
         <nav class="navegacion">
             <ul style="padding-left: 0px;">
+                <!-- Cotizador — todos -->
                 <li>
                     <a href="{{ url_for('cotizador.cotizador') }}">
                         <img src="{{ url_for('static', filename='img/vidaley.png') }}"
@@ -29,6 +97,8 @@
                         <span>Cotizador</span>
                     </a>
                 </li>
+
+                <!-- Historial — todos -->
                 <li>
                     <a href="{{ url_for('historial.historial') }}">
                         <img src="{{ url_for('static', filename='img/vidaley.png') }}"
@@ -36,13 +106,8 @@
                         <span>Historial</span>
                     </a>
                 </li>
-                <li>
-                    <a href="{{ url_for('index.index') }}">
-                        <img src="{{ url_for('static', filename='img/vidaley.png') }}"
-                             style="width:35px;height:35px;margin-right:8px;margin-left:8px;">
-                        <span>Datos</span>
-                    </a>
-                </li>
+
+                <!-- Vehículos — todos (trabajador solo consulta) -->
                 <li>
                     <a href="{{ url_for('vehiculos.vehiculos') }}">
                         <img src="{{ url_for('static', filename='img/vidaley.png') }}"
@@ -50,36 +115,64 @@
                         <span>Vehículos</span>
                     </a>
                 </li>
+
+                {% if session_rol == 'admin' %}
+                <!-- Solo admin -->
+                <li>
+                    <a href="{{ url_for('index.index') }}">
+                        <img src="{{ url_for('static', filename='img/vidaley.png') }}"
+                             style="width:35px;height:35px;margin-right:8px;margin-left:8px;">
+                        <span>Datos <span class="badge-admin">A</span></span>
+                    </a>
+                </li>
                 <li>
                     <a href="{{ url_for('tasas.tasas') }}">
                         <img src="{{ url_for('static', filename='img/vidaley.png') }}"
                              style="width:35px;height:35px;margin-right:8px;margin-left:8px;">
-                        <span>Tasas</span>
+                        <span>Tasas <span class="badge-admin">A</span></span>
                     </a>
                 </li>
                 <li>
                     <a href="{{ url_for('clasificador.clasificador_riesgos') }}">
                         <img src="{{ url_for('static', filename='img/vidaley.png') }}"
                              style="width:35px;height:35px;margin-right:8px;margin-left:8px;">
-                        <span>Clasificador Riesgos</span>
+                        <span>Clasificador <span class="badge-admin">A</span></span>
                     </a>
                 </li>
                 <li>
                     <a href="{{ url_for('carga.carga') }}">
                         <img src="{{ url_for('static', filename='img/vidaley.png') }}"
                              style="width:35px;height:35px;margin-right:8px;margin-left:8px;">
-                        <span>Carga Excel</span>
+                        <span>Carga Excel <span class="badge-admin">A</span></span>
                     </a>
                 </li>
                 <li>
                     <a href="{{ url_for('coberturas.coberturas') }}">
                         <img src="{{ url_for('static', filename='img/vidaley.png') }}"
                              style="width:35px;height:35px;margin-right:8px;margin-left:8px;">
-                        <span>Coberturas</span>
+                        <span>Coberturas <span class="badge-admin">A</span></span>
                     </a>
                 </li>
+                <li>
+                    <a href="{{ url_for('auth.admin_usuarios') }}">
+                        <img src="{{ url_for('static', filename='img/vidaley.png') }}"
+                             style="width:35px;height:35px;margin-right:8px;margin-left:8px;">
+                        <span>Usuarios <span class="badge-admin">A</span></span>
+                    </a>
+                </li>
+                {% endif %}
             </ul>
         </nav>
+
+        <!-- Info del usuario logueado -->
+        <div class="user-info">
+            <div class="user-name">👤 {{ session_username }}</div>
+            <div class="user-rol">{{ session_rol }}</div>
+            <a href="{{ url_for('auth.logout') }}" class="btn-logout">
+                <span class="oculto">Cerrar sesión</span>
+                🚪
+            </a>
+        </div>
     </div>
 
     <main>
