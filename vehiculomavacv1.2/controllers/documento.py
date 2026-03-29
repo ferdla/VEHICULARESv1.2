@@ -3,15 +3,17 @@
 # Rutas: /documento
 # =============================================================================
 
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, session
 from database import get_cursor, commit, rollback
 import models.cotizacion as cotizacion_model
 import models.cobertura as cobertura_model
+from controllers.auth import login_required
 
 bp = Blueprint('documento', __name__)
 
 
 @bp.route('/documento/cotizacion/<int:id_cotizacion>')
+@login_required
 def ver_documento(id_cotizacion):
     cur = get_cursor()
 
@@ -65,6 +67,7 @@ def ver_documento(id_cotizacion):
 
 
 @bp.route('/api/guardar_cotizacion', methods=['POST'])
+@login_required
 def guardar_cotizacion():
     data = request.get_json()
 
@@ -80,13 +83,15 @@ def guardar_cotizacion():
     try:
         numero = cotizacion_model.generar_numero_cotizacion(cur)
 
+        # ── Guardar con id_usuario de la sesión activa ────────────────────
         cotizacion_model.insert_cotizacion(
             cur, numero,
             data.get('nombre_cliente', ''),
             data.get('dni_ruc', ''),
             data.get('placa', ''),
             data.get('email', ''),
-            id_modelo, anio_fabricacion, suma_asegurada
+            id_modelo, anio_fabricacion, suma_asegurada,
+            id_usuario=session.get('id_usuario')   # ← nuevo
         )
         commit()
 
@@ -110,6 +115,7 @@ def guardar_cotizacion():
 
 
 @bp.route('/api/guardar_edicion/<int:id_cotizacion>', methods=['POST'])
+@login_required
 def guardar_edicion(id_cotizacion):
     data = request.get_json()
     cur  = get_cursor()
