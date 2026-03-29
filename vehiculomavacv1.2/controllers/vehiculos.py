@@ -1,7 +1,7 @@
 # =============================================================================
 # controllers/vehiculos.py
 # Rutas: /vehiculos
-# Maneja: marca, modelo + resolución de pendientes con modal
+# Maneja: marca, modelo, valor_vehiculo + resolución de pendientes con modal
 # =============================================================================
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
@@ -75,7 +75,6 @@ def agregar_modelo():
             from database import get_last_insert_id
             id_marca = get_last_insert_id(cur)
 
-            # Revisar reglas pendientes para esta nueva marca
             reglas_pend = _verificar_reglas_pendientes_marca(cur, nueva_marca_nombre, id_marca)
             if reglas_pend:
                 vehiculo_model.insert_modelo(cur, id_marca, nombre_modelo, comentario)
@@ -112,7 +111,13 @@ def agregar_modelo():
                 'nombre_modelo': nombre_modelo,
             })
 
-        flash(f'¡Vehículo "{nombre_modelo}" agregado correctamente!', 'success')
+        # ── Éxito: devolver JSON con id_modelo para abrir modal de valores
+        return jsonify({
+            'success':       True,
+            'tipo':          'modelo_creado',
+            'id_modelo':     nuevo_id_modelo,
+            'nombre_modelo': nombre_modelo,
+        })
 
     except Exception as e:
         rollback()
@@ -157,11 +162,10 @@ def _verificar_excepciones_pendientes_modelo(cur, id_marca, nombre_modelo):
 
 # ==============================================================================
 # RESOLVER PENDIENTES
-# ── CORREGIDO: nombres sin _route para que url_for del template funcione ──────
 # ==============================================================================
 
 @bp.route('/vehiculos/resolver_regla_pendiente', methods=['POST'])
-def resolver_regla_pendiente():          # ← antes: resolver_regla_pendiente_route
+def resolver_regla_pendiente():
     data         = request.get_json()
     id_pendiente = data.get('id_pendiente')
     id_marca     = data.get('id_marca')
@@ -180,7 +184,7 @@ def resolver_regla_pendiente():          # ← antes: resolver_regla_pendiente_r
 
 
 @bp.route('/vehiculos/resolver_pendiente', methods=['POST'])
-def resolver_pendiente():                # ← antes: resolver_pendiente_route
+def resolver_pendiente():
     data         = request.get_json()
     id_pendiente = data.get('id_pendiente')
     id_modelo    = data.get('id_modelo')
@@ -236,3 +240,98 @@ def eliminar_modelo(id):
     finally:
         cur.close()
     return redirect(url_for('vehiculos.vehiculos'))
+
+
+# ==============================================================================
+# VALORES VEHICULARES — API
+# ==============================================================================
+
+@bp.route('/api/valores_modelo/<int:id_modelo>')
+def api_valores_modelo(id_modelo):
+    """Devuelve todos los valores registrados para un modelo."""
+    cur = get_cursor()
+    try:
+        valores = vehiculo_model.get_todos_valores_modelo(cur, id_modelo)
+        # Info del modelo
+        mod = vehiculo_model.get_modelo_by_id(cur, id_modelo)
+        return jsonify({
+            'ok':           True,
+            'id_modelo':    id_modelo,
+            'nombre':       f"{mod[3]} {mod[2]}" if mod else '',
+            'valores':      valores,
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+    finally:
+        cur.close()
+
+
+@bp.route('/api/valores_modelo/<int:id_modelo>/guardar', methods=['POST'])
+def api_guardar_valores_modelo(id_modelo):
+    """
+    Guarda (upsert) los valores enviados para un modelo.
+    Espera JSON:
+    {
+        "vrn": 25000.00,          ← null si no se ingresa
+        "historicos": [
+            {"anio": 2022, "valor": 21000},
+            {"anio": 2021, "valor": 18500},
+            ...
+        ]
+    }
+    """
+    data = request.get_json()
+    cur  = get_cursor()
+    try:
+        insertados  = 0
+        actualizados = 0
+
+        # VRN
+        vrn = data.get('vrn')
+        if vrn is not None and float(vrn) > 0:
+            accion = vehiculo_model.upsert_valor_vehiculo(cur, id_modelo, None, float(vrn), 'VRN')
+            if accion == 'inserted':
+                insertados += 1
+            else:
+                actualizados += 1
+
+        # Históricos
+        for item in data.get('historicos', []):
+            anio  = item.get('anio')
+            valor = item.get('valor')
+            if anio and valor and float(valor) > 0:
+                accion = vehiculo_model.upsert_valor_vehiculo(
+                    cur, id_modelo, int(anio), float(valor), 'HISTORICO'
+                )
+                if accion == 'inserted':
+                    insertados += 1
+                else:
+                    actualizados += 1
+
+        commit()
+        return jsonify({
+            'ok':         True,
+            'insertados': insertados,
+            'actualizados': actualizados,
+        })
+
+    except Exception as e:
+        rollback()
+        return jsonify({'ok': False, 'error': str(e)})
+    finally:
+        cur.close()
+
+
+@bp.route('/api/valores_modelo/eliminar/<int:id_valor>', methods=['POST'])
+def api_eliminar_valor(id_valor):
+    """Elimina un valor vehicular por su id_valor."""
+    cur = get_cursor()
+    try:
+        vehiculo_model.delete_valor_vehiculo(cur, id_valor)
+        commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        rollback()
+        return jsonify({'ok': False, 'error': str(e)})
+    finally:
+        cur.close()
